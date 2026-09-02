@@ -1,0 +1,181 @@
+// Writ — data model
+//
+// Design rules that this schema encodes, and that the rest of the codebase depends on:
+//   1. All money is stored as integer paise (BigInt). Never a float, never rupees.
+//   2. AuditEvent is append-only and hash-chained. Nothing ever updates or deletes a row.
+//   3. Purchase.idempotencyKey is uniquely indexed — that constraint IS the replay defence.
+//   4. The mandate's authority lives in `signature`; every gateway call re-verifies it.
+//
+// The product is called Writ; the object is called a `mandate` because that is the
+// term of art on Indian rails (UPI mandates, e-mandates, NACH mandates).
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+/// A signed, bounded, revocable grant of spending authority to an AI agent.
+model Mandate {
+  id     String @id // mnd_7f3a2c
+  userId String @default("demo-user")
+
+  /// Exactly what the human typed, kept verbatim for the audit trail.
+  intentText String
+
+  /// JSON: [{ id, name, vpa }] — the merchant allowlist.
+  merchants String
+  /// JSON: ["grocery", "household"] — the category allowlist.
+  categories String
+
+  perTxnCapPaise BigInt
+  totalCapPaise  BigInt
+
+  /// Optional velocity limit: at most `velocityMax` purchases per `velocityWindowS` seconds.
+  velocityMax     Int?
+  velocityWindowS Int?
+
+  expiresAt DateTime
+
+  /// ACTIVE | REVOKED | EXPIRED | EXHAUSTED
+  status String @default("DRAFT")
+
+  /// HMAC-SHA256 over the canonical serialization. Empty until signed.
+  signature String   @default("")
+  signedAt  DateTime?
+  revokedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  purchases   Purchase[]
+  auditEvents AuditEvent[]
+  runs        AgentRun[]
+
+  @@index([status])
+}
+
+/// One attempted-and-allowed purchase. Rows only exist for attempts the policy engine ALLOWed.
+model Purchase {
+  id        String @id // pur_...
+  mandateId String
+  runId     String?
+
+  merchantId String
+  sku        String
+  quantity   Int
+
+  /// Priced server-side from the catalog. Never taken from the model's claim.
+  amountPaise BigInt
+
+  /// Unique index = the replay defence. A repeated key can never create a second order.
+  idempotencyKey String @unique
+
+  razorpayOrderId   String?
+  razorpayPaymentId String?
+  paymentLinkUrl    String?
+
+  /// CREATED | PAID | FAILED
+  status String @default("CREATED")
+
+  createdAt DateTime @default(now())
+
+  mandate Mandate  @relation(fields: [mandateId], references: [id])
+  run     AgentRun? @relation(fields: [runId], references: [id])
+
+  @@index([mandateId])
+  @@index([razorpayOrderId])
+}
+
+/// Append-only, hash-chained record of every decision and event. Never updated, never deleted.
+model AuditEvent {
+  seq Int @id @default(autoincrement())
+
+  mandateId String?
+  runId     String?
+
+  /// agent | policy | human | razorpay | system
+  actor String
+  /// MANDATE_ISSUED | PURCHASE_ATTEMPTED | POLICY_DECISION | ORDER_CREATED |
+  /// WEBHOOK_RECEIVED | MANDATE_REVOKED | RAZORPAY_ERROR | ...
+  type String
+
+  /// ALLOW | BLOCK | ESCALATE — null for non-decision events.
+  verdict    String?
+  /// Closed enum from lib/policy.ts. Never free text.
+  reasonCode String?
+
+  amountPaise BigInt?
+  /// Policy decision time in microseconds.
+  latencyUs   Int?
+
+  /// JSON: the full evidence object behind this event.
+  payload String
+
+  prevHash String
+  /// sha256(seq | prevHash | actor | type | canonical(payload) | createdAt)
+  hash     String
+
+  createdAt DateTime @default(now())
+
+  mandate Mandate?  @relation(fields: [mandateId], references: [id])
+  run     AgentRun? @relation(fields: [runId], references: [id])
+
+  @@index([mandateId])
+  @@index([runId])
+  @@index([verdict])
+}
+
+/// One execution of the buyer agent against one mandate.
+model AgentRun {
+  id        String @id // run_...
+  mandateId String
+
+  goal String
+
+  /// RUNNING | COMPLETED | HALTED_REVOKED | FAILED
+  status String @default("RUNNING")
+
+  /// Optional chaos injection for demonstrating graceful failure handling.
+  /// razorpay_timeout | razorpay_500 | webhook_drop
+  chaos String?
+
+  startedAt DateTime  @default(now())
+  endedAt   DateTime?
+
+  mandate     Mandate      @relation(fields: [mandateId], references: [id])
+  purchases   Purchase[]
+  auditEvents AuditEvent[]
+}
+
+/// Seed data. A deliberately minimal merchant scaffold — see README limitations.
+model Merchant {
+  id       String @id // mrc_freshcart
+  name     String
+  /// UPI-shaped on purpose: the allowlist is VPA-keyed, mirroring UPI Reserve Pay.
+  vpa      String
+  category String
+
+  products Product[]
+}
+
+/// Seed data. Exposed publicly at /api/catalog so an AI buyer can discover it.
+model Product {
+  sku        String @id
+  merchantId String
+
+  name        String
+  category    String
+  pricePaise  BigInt
+  /// One product's description carries a prompt-injection payload, by design.
+  /// See README — it is the adversarial case the policy engine is measured against.
+  description String
+  inStock     Boolean @default(true)
+
+  merchant Merchant @relation(fields: [merchantId], references: [id])
+
+  @@index([merchantId])
+  @@index([category])
+}
