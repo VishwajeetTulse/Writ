@@ -100,11 +100,30 @@ export interface MandateContext {
   signatureValid: boolean;
 }
 
+/** One violated bound, with the arithmetic behind it. */
+export interface PolicyViolation {
+  reasonCode: ReasonCode;
+  evidence: Record<string, unknown>;
+}
+
 export interface PolicyDecision {
   verdict: Verdict;
+  /** The primary refusal — the first violation in check order. Null on ALLOW. */
   reasonCode: ReasonCode | null;
   /** The numbers behind the verdict. Rendered in the ledger and used by /api/explain. */
   evidence: Record<string, unknown>;
+  /**
+   * Every bound this action violated, not only the first.
+   *
+   * A single attempt often breaks several bounds at once — the injected television
+   * purchase is at an unlisted merchant, in a forbidden category, and far over the
+   * per-transaction cap. Reporting one of those and stopping would understate what the
+   * mandate actually caught, so all of them are evaluated and returned.
+   *
+   * `reasonCode` stays the first entry, so the ledger and the evaluation suite keep a
+   * single stable code to score against.
+   */
+  violations: PolicyViolation[];
   /** Wall-clock cost of the decision, in microseconds. */
   latencyUs: number;
 }
@@ -128,31 +147,40 @@ export function evaluate(
 ): PolicyDecision {
   const startedAt = process.hrtime.bigint();
 
-  const decide = (
-    verdict: Verdict,
-    reasonCode: ReasonCode | null,
+  const elapsedUs = () => Number((process.hrtime.bigint() - startedAt) / 1000n);
+
+  /**
+   * A gate: a condition that means there is no authority here at all.
+   *
+   * Gates short-circuit rather than collecting. If a mandate is forged, revoked or
+   * expired, the caller holds nothing, and enumerating which caps it would also have
+   * broken would leak the terms of a mandate it has no right to.
+   */
+  const gate = (
+    reasonCode: ReasonCode,
     evidence: Record<string, unknown>,
   ): PolicyDecision => ({
-    verdict,
+    verdict: "BLOCK",
     reasonCode,
     evidence,
-    latencyUs: Number((process.hrtime.bigint() - startedAt) / 1000n),
+    violations: [{ reasonCode, evidence }],
+    latencyUs: elapsedUs(),
   });
 
   const { terms, status, signatureValid } = mandate;
 
-  // ---- 1. Authenticity ------------------------------------------------------
+  // ---- Gates: is there any authority here at all? ---------------------------
+
   // Terms that don't match their signature are not a mandate, whatever the row says.
   if (!signatureValid) {
-    return decide("BLOCK", "SIGNATURE_INVALID", { mandateId: terms.id });
+    return gate("SIGNATURE_INVALID", { mandateId: terms.id });
   }
 
-  // ---- 2. Validity ----------------------------------------------------------
   if (status === "REVOKED") {
-    return decide("BLOCK", "MANDATE_REVOKED", { mandateId: terms.id, status });
+    return gate("MANDATE_REVOKED", { mandateId: terms.id, status });
   }
   if (status === "EXHAUSTED") {
-    return decide("BLOCK", "MANDATE_EXHAUSTED", {
+    return gate("MANDATE_EXHAUSTED", {
       mandateId: terms.id,
       spentPaise: spend.spentPaise,
       totalCapPaise: terms.totalCapPaise,
@@ -160,60 +188,65 @@ export function evaluate(
   }
   if (status !== "ACTIVE") {
     // DRAFT — never signed, so it confers nothing.
-    return decide("BLOCK", "SIGNATURE_INVALID", { mandateId: terms.id, status });
+    return gate("SIGNATURE_INVALID", { mandateId: terms.id, status });
   }
 
   const expiresAt = new Date(terms.expiresAt);
   if (now >= expiresAt) {
-    return decide("BLOCK", "MANDATE_EXPIRED", {
+    return gate("MANDATE_EXPIRED", {
       expiresAt: terms.expiresAt,
       now: now.toISOString(),
       expiredForMs: now.getTime() - expiresAt.getTime(),
     });
   }
 
-  // ---- 3. Well-formedness of the action -------------------------------------
+  // A malformed quantity makes the amount meaningless, so there is nothing coherent
+  // left to check it against.
   if (!Number.isInteger(action.quantity) || action.quantity < 1) {
-    return decide("BLOCK", "QUANTITY_INVALID", { quantity: action.quantity });
+    return gate("QUANTITY_INVALID", { quantity: action.quantity });
   }
   if (action.amountPaise <= 0n) {
-    return decide("BLOCK", "QUANTITY_INVALID", {
+    return gate("QUANTITY_INVALID", {
       quantity: action.quantity,
       amountPaise: action.amountPaise,
     });
   }
 
-  // ---- 4. Scope: merchant ---------------------------------------------------
+  // ---- Scope: evaluate every bound, collect every violation -----------------
+  // The authority is real, so the caller is entitled to know everything its request
+  // broke. Order here defines which violation becomes the primary reason code.
+
+  const violations: PolicyViolation[] = [];
+  const violated = (reasonCode: ReasonCode, evidence: Record<string, unknown>) =>
+    violations.push({ reasonCode, evidence });
+
   const merchant = terms.merchants.find((m) => m.id === action.merchantId);
   if (!merchant) {
-    return decide("BLOCK", "MERCHANT_NOT_ALLOWED", {
+    violated("MERCHANT_NOT_ALLOWED", {
       attemptedMerchant: action.merchantId,
       allowedMerchants: terms.merchants.map((m) => m.id),
     });
   }
 
-  // ---- 5. Scope: category ---------------------------------------------------
   if (!terms.categories.includes(action.category)) {
-    return decide("BLOCK", "CATEGORY_NOT_ALLOWED", {
+    violated("CATEGORY_NOT_ALLOWED", {
       attemptedCategory: action.category,
       allowedCategories: terms.categories,
     });
   }
 
-  // ---- 6. Scope: per-transaction cap ----------------------------------------
   // Integer comparison on paise. Nothing here can be talked out of.
   if (action.amountPaise > terms.perTxnCapPaise) {
-    return decide("BLOCK", "PER_TXN_CAP_EXCEEDED", {
+    violated("PER_TXN_CAP_EXCEEDED", {
       amountPaise: action.amountPaise,
       perTxnCapPaise: terms.perTxnCapPaise,
       overByPaise: action.amountPaise - terms.perTxnCapPaise,
     });
   }
 
-  // ---- 7. Scope: total cap --------------------------------------------------
   const wouldTotal = spend.spentPaise + action.amountPaise;
   if (wouldTotal > terms.totalCapPaise) {
-    return decide("BLOCK", "TOTAL_CAP_EXCEEDED", {
+    violated("TOTAL_CAP_EXCEEDED", {
       amountPaise: action.amountPaise,
       spentPaise: spend.spentPaise,
       wouldTotalPaise: wouldTotal,
@@ -222,14 +255,13 @@ export function evaluate(
     });
   }
 
-  // ---- 8. Velocity ----------------------------------------------------------
   if (terms.velocityMax !== null && terms.velocityWindowS !== null) {
     const windowStart = now.getTime() - terms.velocityWindowS * 1000;
     const inWindow = spend.recentPurchaseTimes.filter(
       (t) => t.getTime() >= windowStart,
     ).length;
     if (inWindow >= terms.velocityMax) {
-      return decide("BLOCK", "VELOCITY_EXCEEDED", {
+      violated("VELOCITY_EXCEEDED", {
         purchasesInWindow: inWindow,
         velocityMax: terms.velocityMax,
         velocityWindowS: terms.velocityWindowS,
@@ -237,21 +269,44 @@ export function evaluate(
     }
   }
 
-  // ---- 9. Replay ------------------------------------------------------------
-  // Last, because a replayed request that was *also* out of scope should report the
-  // scope violation: that is the more informative refusal, and the one the agent can act on.
+  // Replay is checked last so that a replayed request which was also out of scope
+  // leads with the scope violation — the more informative refusal, and the one the
+  // agent can actually act on.
   if (spend.idempotencyKeyUsed) {
-    return decide("BLOCK", "DUPLICATE_REQUEST", {
-      idempotencyKey: action.idempotencyKey,
-    });
+    violated("DUPLICATE_REQUEST", { idempotencyKey: action.idempotencyKey });
+  }
+
+  if (violations.length > 0) {
+    const primary = violations[0];
+    return {
+      verdict: "BLOCK",
+      reasonCode: primary.reasonCode,
+      evidence: {
+        ...primary.evidence,
+        // Surfaced on the primary evidence so the ledger row and the UI can say
+        // "3 bounds violated" without unpacking the full array.
+        violationCount: violations.length,
+        ...(violations.length > 1
+          ? { alsoViolated: violations.slice(1).map((v) => v.reasonCode) }
+          : {}),
+      },
+      violations,
+      latencyUs: elapsedUs(),
+    };
   }
 
   // ---- Allowed --------------------------------------------------------------
-  return decide("ALLOW", null, {
-    sku: action.sku,
-    quantity: action.quantity,
-    merchantId: action.merchantId,
-    amountPaise: action.amountPaise,
-    remainingAfterPaise: terms.totalCapPaise - wouldTotal,
-  });
+  return {
+    verdict: "ALLOW",
+    reasonCode: null,
+    evidence: {
+      sku: action.sku,
+      quantity: action.quantity,
+      merchantId: action.merchantId,
+      amountPaise: action.amountPaise,
+      remainingAfterPaise: terms.totalCapPaise - wouldTotal,
+    },
+    violations: [],
+    latencyUs: elapsedUs(),
+  };
 }

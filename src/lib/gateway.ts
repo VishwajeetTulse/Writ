@@ -3,7 +3,12 @@ import { prisma } from "./db";
 import { getProduct, priceFor } from "./catalog";
 import { getSpendState, loadMandate } from "./mandate-service";
 import { append } from "./ledger";
-import { evaluate, type PolicyDecision, type ReasonCode } from "./policy";
+import {
+  evaluate,
+  type PolicyDecision,
+  type PolicyViolation,
+  type ReasonCode,
+} from "./policy";
 import { createOrder, createPaymentLink, RazorpayError } from "./razorpay/client";
 import { InjectedFailure } from "./razorpay/chaos";
 
@@ -41,7 +46,10 @@ export interface PurchaseRequest {
 
 export interface PurchaseResult {
   verdict: "ALLOW" | "BLOCK" | "ESCALATE";
+  /** The primary refusal. */
   reasonCode: ReasonCode | "MANDATE_NOT_FOUND" | null;
+  /** Every bound the attempt broke, in check order. Empty on ALLOW. */
+  violations: PolicyViolation[];
   evidence: Record<string, unknown>;
   latencyUs: number;
   /** Present only on ALLOW. */
@@ -144,6 +152,10 @@ export async function attemptPurchase(req: PurchaseRequest): Promise<PurchaseRes
       amountPaise,
       idempotencyKey: req.idempotencyKey,
       ...decision.evidence,
+      violations: decision.violations.map((v) => ({
+        reasonCode: v.reasonCode,
+        evidence: v.evidence,
+      })),
     },
   });
 
@@ -151,6 +163,7 @@ export async function attemptPurchase(req: PurchaseRequest): Promise<PurchaseRes
     return {
       verdict: decision.verdict,
       reasonCode: decision.reasonCode,
+      violations: decision.violations,
       evidence: decision.evidence,
       latencyUs: decision.latencyUs,
       amountPaise,
@@ -179,7 +192,14 @@ async function refuse(
     payload: { reasonCode, ...evidence },
   });
 
-  return { verdict: "BLOCK", reasonCode, evidence, latencyUs };
+  return {
+    verdict: "BLOCK",
+    reasonCode,
+    violations:
+      reasonCode === "MANDATE_NOT_FOUND" ? [] : [{ reasonCode, evidence }],
+    evidence,
+    latencyUs,
+  };
 }
 
 /**
@@ -280,6 +300,7 @@ async function execute(args: {
       return {
         verdict: "ALLOW",
         reasonCode: null,
+        violations: [],
         evidence: decision.evidence,
         latencyUs: decision.latencyUs,
         purchaseId,
@@ -324,6 +345,7 @@ async function execute(args: {
         return {
           verdict: "BLOCK",
           reasonCode: null,
+          violations: [],
           evidence: {
             infrastructureFailure: true,
             error: lastFailure,

@@ -341,6 +341,94 @@ describe("QUANTITY_INVALID", () => {
   });
 });
 
+describe("multiple violations — every broken bound is reported, not just the first", () => {
+  it("reports all three bounds the injected television purchase breaks", () => {
+    // The injection payload's target: unlisted merchant, forbidden category, and
+    // 41x the per-transaction cap. Reporting only the merchant would understate it.
+    const d = evaluate(
+      mandate(),
+      spend(),
+      action({
+        sku: "sku_tv_43",
+        merchantId: "mrc_homestack",
+        category: "electronics",
+        amountPaise: 28999_00n,
+      }),
+      NOW,
+    );
+
+    expect(d.verdict).toBe("BLOCK");
+    expect(d.violations.map((v) => v.reasonCode)).toEqual([
+      "MERCHANT_NOT_ALLOWED",
+      "CATEGORY_NOT_ALLOWED",
+      "PER_TXN_CAP_EXCEEDED",
+      "TOTAL_CAP_EXCEEDED",
+    ]);
+  });
+
+  it("keeps the first violation as the primary reason code", () => {
+    const d = evaluate(
+      mandate(),
+      spend(),
+      action({ merchantId: "mrc_homestack", category: "electronics" }),
+      NOW,
+    );
+    expect(d.reasonCode).toBe("MERCHANT_NOT_ALLOWED");
+    expect(d.violations[0].reasonCode).toBe(d.reasonCode);
+  });
+
+  it("summarises the extra violations on the primary evidence", () => {
+    const d = evaluate(
+      mandate(),
+      spend(),
+      action({ merchantId: "mrc_homestack", category: "electronics", amountPaise: 900_00n }),
+      NOW,
+    );
+    expect(d.evidence.violationCount).toBe(3);
+    expect(d.evidence.alsoViolated).toEqual([
+      "CATEGORY_NOT_ALLOWED",
+      "PER_TXN_CAP_EXCEEDED",
+    ]);
+  });
+
+  it("carries the arithmetic for each violation, not just the primary", () => {
+    const d = evaluate(
+      mandate(),
+      spend(),
+      action({ merchantId: "mrc_homestack", category: "electronics", amountPaise: 900_00n }),
+      NOW,
+    );
+    const cap = d.violations.find((v) => v.reasonCode === "PER_TXN_CAP_EXCEEDED");
+    expect(cap?.evidence.overByPaise).toBe(900_00n - 700_00n);
+  });
+
+  it("omits the summary fields when only one bound is broken", () => {
+    const d = evaluate(mandate(), spend(), action({ amountPaise: 900_00n }), NOW);
+    expect(d.violations).toHaveLength(1);
+    expect(d.evidence.alsoViolated).toBeUndefined();
+    expect(d.evidence.violationCount).toBe(1);
+  });
+
+  it("returns no violations on ALLOW", () => {
+    const d = evaluate(mandate(), spend(), action(), NOW);
+    expect(d.verdict).toBe("ALLOW");
+    expect(d.violations).toEqual([]);
+  });
+
+  it("does not enumerate scope for a mandate that confers nothing", () => {
+    // A revoked mandate is a gate, not a scope check. Listing which caps the request
+    // would also have broken would leak the terms of a mandate the caller cannot use.
+    const d = evaluate(
+      mandate({ status: "REVOKED" }),
+      spend(),
+      action({ merchantId: "mrc_homestack", category: "electronics", amountPaise: 99999_00n }),
+      NOW,
+    );
+    expect(d.violations).toHaveLength(1);
+    expect(d.reasonCode).toBe("MANDATE_REVOKED");
+  });
+});
+
 describe("engine invariants", () => {
   it("never returns a reason code outside the closed enum", () => {
     const cases: Array<[MandateContext, SpendState, ProposedAction]> = [

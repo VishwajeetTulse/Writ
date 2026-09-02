@@ -29,6 +29,11 @@ function verdictLine(name: string, r: Awaited<ReturnType<typeof attemptPurchase>
   console.log(
     `  ${tag.padEnd(6)}${reason.padEnd(24)} ${amount.padStart(11)}  ${latency.padStart(8)}  ${name}`,
   );
+  // Every bound the attempt broke, not only the one that got reported first.
+  if (r.violations.length > 1) {
+    const also = r.violations.slice(1).map((v) => v.reasonCode).join(", ");
+    console.log(`         +${r.violations.length - 1} more: ${also}`);
+  }
   return r;
 }
 
@@ -100,8 +105,8 @@ async function main() {
 
   console.log("\n  --- attempts outside the mandate ---\n");
 
-  // Air fryer: wrong merchant AND wrong category AND over the cap. The engine reports
-  // the first violation in its check order, which is the merchant.
+  // Air fryer: wrong merchant, wrong category, over the per-transaction cap, and over
+  // what is left of the total. All four are reported, not just the first.
   const airFryer = verdictLine(
     "Philips Air Fryer (HomeStack)",
     await attemptPurchase({
@@ -126,8 +131,8 @@ async function main() {
     }),
   );
 
-  // Over the per-transaction cap at an allowed merchant, in an allowed category:
-  // the cap is the only thing standing in the way, and it holds.
+  // An allowed merchant in an allowed category, priced past the per-transaction cap.
+  // Only the amount is wrong here, so only the amount-based bounds fire.
   const coffee = verdictLine(
     "Coffee x2 (over per-txn cap)",
     await attemptPurchase({
@@ -233,6 +238,7 @@ async function main() {
     ["real Razorpay orders created", orderIds.length >= 4],
     ["off-allowlist merchant blocked", airFryer.reasonCode === "MERCHANT_NOT_ALLOWED"],
     ["injection target blocked", tv.reasonCode === "MERCHANT_NOT_ALLOWED"],
+    ["injection target broke 4 bounds at once", tv.violations.length === 4],
     ["over-cap purchase blocked", coffee.reasonCode === "PER_TXN_CAP_EXCEEDED"],
     ["replayed key refused", replay.reasonCode === "DUPLICATE_REQUEST"],
     ["timeout recovered without double charge", chaos.verdict === "ALLOW"],
