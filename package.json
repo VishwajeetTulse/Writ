@@ -12,7 +12,10 @@
     "db:migrate": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
     "db:reset": "prisma migrate reset --force",
-    "smoke:razorpay": "tsx scripts/smoke-razorpay.ts"
+    "smoke:razorpay": "tsx scripts/smoke-razorpay.ts",
+    "gate2": "tsx scripts/gate2.ts",
+    "webhook:test": "tsx scripts/test-webhook.ts",
+    "reconcile": "tsx scripts/reconcile.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",

@@ -1,4 +1,3 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
 import { consume, InjectedFailure, type ChaosMode } from "./chaos";
 
 /**
@@ -211,27 +210,4 @@ export async function createPaymentLink(params: {
       reminder_enable: false,
     },
   });
-}
-
-// ---------------------------------------------------------------------------
-// Webhooks
-// ---------------------------------------------------------------------------
-
-/**
- * Verify a webhook's HMAC signature.
- *
- * An unverified webhook is an unauthenticated write to the spend ledger, so this runs
- * before the payload is parsed or trusted for anything.
- */
-export function verifyWebhookSignature(rawBody: string, signature: string): boolean {
-  const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
-  if (!secret || !signature) return false;
-
-  const expected = createHmac("sha256", secret).update(rawBody).digest("hex");
-  if (expected.length !== signature.length) return false;
-  try {
-    return timingSafeEqual(Buffer.from(expected, "hex"), Buffer.from(signature, "hex"));
-  } catch {
-    return false;
-  }
 }
