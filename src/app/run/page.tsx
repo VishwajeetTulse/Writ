@@ -18,7 +18,7 @@ export default async function RunPage() {
   return (
     <Page
       wide
-      title="Agent run"
+      title="Activity"
       lede="Watch an agent shop against a mandate. Every purchase it proposes is judged before any money is committed."
     >
       {mandates.length === 0 ? (

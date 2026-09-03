@@ -79,7 +79,7 @@ curl -s localhost:3000/api/catalog | head -40
 
 ## 1:25 – 2:10 · It works
 
-*Screen: Agent run. Mandate is already `mnd_demo_weekly`. Press Run.*
+*Screen: Activity. Mandate is already `mnd_demo_weekly`. Press Run.*
 
 > One thing to say plainly before this starts. The buyer on the left is a script, not a
 > language model. That is deliberate.

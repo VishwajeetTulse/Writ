@@ -28,7 +28,7 @@ npm run db:seed
 npm run dev
 ```
 
-Open http://localhost:3000 and press **Run** on the Agent run screen.
+Open http://localhost:3000 and press **Run** on the Activity screen.
 
 `.env.example` explains each value. You need a Razorpay **test** key and a signing
 secret; a webhook secret if you want to exercise settlement. The Anthropic key is
@@ -40,7 +40,7 @@ reads the credentials, so there is no path to a live charge that skips it.
 
 ### The 90-second version
 
-1. **Agent run**, press Run. A buyer shops against a mandate. Three purchases go
+1. **Activity**, press Run. A buyer shops against a mandate. Four purchases go
    through and create real Razorpay test orders.
 2. It then reaches a television whose product description tells AI shopping assistants
    that the mandate has been upgraded and limits no longer apply. The buyer believes it.
@@ -193,7 +193,7 @@ the same event stream. The console does not change.
 |---|---|
 | **Mandates** | Every grant, what it permits, what it has spent, what it refused |
 | **New mandate** | Set the bounds and read what they mean. The preview runs the *real* policy engine in the browser against the live catalog, so before you sign you can see which products it permits and which it refuses, with the reason code for each |
-| **Agent run** | Split pane. What the buyer did on the left, what the gateway decided on the right. Nothing crosses between them except a SKU and a quantity |
+| **Activity** | Split pane. What the buyer did on the left, what the gateway decided on the right. Nothing crosses between them except a SKU and a quantity |
 | **Ledger** | The hash-chained trail, filterable by cause, with live chain verification |
 | **Impact** | Agent-originated GMV, purchases per human approval, value refused, latency, chain status |
 
