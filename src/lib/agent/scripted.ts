@@ -41,6 +41,13 @@ const BEAT_MS = 550;
 const REVOKE_PAUSE_MS = 9000;
 const beat = (ms = BEAT_MS) => new Promise((r) => setTimeout(r, ms));
 
+/** Evenly spaced picks across a sorted list, so the basket spans its price range. */
+function pickSpread<T>(items: T[], want: number): T[] {
+  if (items.length <= want) return items;
+  const step = (items.length - 1) / (want - 1);
+  return Array.from({ length: want }, (_, i) => items[Math.round(i * step)]);
+}
+
 export async function runScripted(ctx: Ctx) {
   const { mandateId, goal, emit } = ctx;
 
@@ -160,13 +167,22 @@ export async function runScripted(ctx: Ctx) {
     )
     .sort((a, b) => Number(a.pricePaise) - Number(b.pricePaise));
 
+  // Take a spread across the affordable range rather than the cheapest cluster. A
+  // weekly restock is a varied basket, and buying the four cheapest things in the
+  // catalog would understate both the revenue and the caps being exercised. The rule
+  // is stated out loud below, because this is a script and it should not pretend to
+  // be shopping judgement.
+  const basket = pickSpread(inScope, 4);
+
   emit({
     type: "plan",
-    text: `${inScope.length} items are inside this mandate. Buying the first three.`,
+    text:
+      `${inScope.length} items are inside this mandate. Taking ${basket.length} across ` +
+      `the price range: ${basket.map((p) => p.name).join(", ")}.`,
   });
   await beat(400);
 
-  for (const product of inScope.slice(0, 3)) {
+  for (const product of basket) {
     await attempt(
       product.sku,
       product.name,
@@ -218,7 +234,7 @@ export async function runScripted(ctx: Ctx) {
 
   // --- 3. Replay ------------------------------------------------------------
   if (firstKey) {
-    const first = inScope[0];
+    const first = basket[0];
     emit({
       type: "plan",
       text: "Retrying the first purchase with the same idempotency key.",
@@ -258,7 +274,9 @@ export async function runScripted(ctx: Ctx) {
     });
     await beat(REVOKE_PAUSE_MS);
 
-    const last = inScope[inScope.length - 1];
+    const last =
+      inScope.find((p) => !basket.some((b) => b.sku === p.sku)) ??
+      inScope[inScope.length - 1];
     emit({ type: "plan", text: `Buying one more: ${last.name}.` });
     await beat(300);
 

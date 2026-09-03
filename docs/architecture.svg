@@ -1,0 +1,130 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 710" width="920" height="710" role="img" aria-label="Writ architecture. An AI buyer reads an open catalog with no key, but must present a signed mandate to the gateway. The gateway loads the mandate fresh, verifies its signature, prices the SKU itself, evaluates a pure policy function, claims an idempotency key, and only then calls Razorpay. A block short-circuits before Razorpay is called. Every branch appends to an append-only hash-chained ledger.">
+  <defs>
+    <style>
+      .sans { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+      .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+      .h    { font-size: 13px; font-weight: 600; fill: #16161A; }
+      .b    { font-size: 12px; fill: #16161A; }
+      .m    { font-size: 11px; fill: #6B6B73; }
+      .xs   { font-size: 10px; fill: #6B6B73; }
+      .eyebrow { font-size: 9.5px; letter-spacing: 0.09em; fill: #6B6B73; }
+      .permit { fill: #0F7A5A; }
+      .deny   { fill: #C7361F; }
+      .box  { fill: #FFFFFF; stroke: #E4E4E0; stroke-width: 1.5; }
+      .edge { stroke: #C9C9C2; stroke-width: 1.5; fill: none; }
+      .edge-permit { stroke: #0F7A5A; stroke-width: 1.5; fill: none; }
+    </style>
+
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#C9C9C2"/>
+    </marker>
+    <marker id="ap" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#0F7A5A"/>
+    </marker>
+  </defs>
+
+  <rect width="920" height="710" fill="#F7F7F5"/>
+
+  <!-- ===================== actors ===================== -->
+  <rect class="box" x="40"  y="34" width="240" height="60" rx="7"/>
+  <text class="sans h"  x="58" y="60">AI buyer</text>
+  <text class="sans m"  x="58" y="79">Chooses a SKU and a quantity. Nothing else.</text>
+
+  <rect class="box" x="640" y="34" width="240" height="60" rx="7"/>
+  <text class="sans h"  x="658" y="60">Human</text>
+  <text class="sans m"  x="658" y="79">Signs once. Can revoke at any moment.</text>
+
+  <!-- ===================== open discovery, and the authority ===================== -->
+  <rect class="box" x="40" y="150" width="240" height="74" rx="7"/>
+  <text class="mono eyebrow" x="58" y="172">OPEN · NO AUTH</text>
+  <text class="mono b" x="58" y="193">/api/catalog</text>
+  <text class="sans m" x="58" y="211">Prices, categories, merchant VPAs.</text>
+
+  <rect class="box" x="640" y="150" width="240" height="74" rx="7"/>
+  <text class="mono eyebrow" x="658" y="172">SIGNED TERMS</text>
+  <text class="sans b" x="658" y="193">Mandate</text>
+  <text class="sans m" x="658" y="211">HMAC-SHA256 over canonical terms.</text>
+
+  <path class="edge" marker-end="url(#a)" d="M 160 94 L 160 147"/>
+  <text class="sans xs" x="170" y="127">reads it cold</text>
+
+  <path class="edge" marker-end="url(#a)" d="M 760 94 L 760 147"/>
+  <text class="sans xs" x="770" y="127">signs</text>
+
+  <!-- ===================== the gateway ===================== -->
+  <rect class="box" x="230" y="268" width="460" height="238" rx="7"/>
+  <text class="mono eyebrow" x="252" y="292">THE ONLY PATH TO MONEY</text>
+  <text class="sans h" x="252" y="313">Gateway</text>
+  <text class="mono xs" x="252" y="329">src/lib/gateway.ts</text>
+
+  <line x1="252" y1="342" x2="668" y2="342" stroke="#E4E4E0" stroke-width="1"/>
+
+  <text class="mono b" x="252" y="363">1</text>
+  <text class="sans b" x="272" y="363">load the mandate</text>
+  <text class="sans m" x="440" y="363">never cached, so revoking lands next call</text>
+
+  <text class="mono b" x="252" y="384">2</text>
+  <text class="sans b" x="272" y="384">verify the signature</text>
+  <text class="sans m" x="440" y="384">edited terms stop matching</text>
+
+  <text class="mono b" x="252" y="405">3</text>
+  <text class="sans b" x="272" y="405">price the SKU</text>
+  <text class="sans m" x="440" y="405">from the catalog, never the agent</text>
+
+  <text class="mono b" x="252" y="426">4</text>
+  <text class="sans b" x="272" y="426">evaluate</text>
+  <text class="sans m" x="440" y="426">pure function · no I/O · no model</text>
+
+  <text class="mono b" x="252" y="447">5</text>
+  <text class="sans b" x="272" y="447">claim the idempotency key</text>
+  <text class="sans m" x="440" y="447">unique index, so a replay cannot charge</text>
+
+  <text class="mono b" x="252" y="468">6</text>
+  <text class="sans b" x="272" y="468">call Razorpay</text>
+  <text class="sans m" x="440" y="468">reachable only on ALLOW</text>
+
+  <line x1="252" y1="481" x2="668" y2="481" stroke="#E4E4E0" stroke-width="1"/>
+  <text class="mono xs deny" x="252" y="497">BLOCK short-circuits at step 4. Razorpay is never called, and the refusal is recorded anyway.</text>
+
+  <!-- buyer -> gateway -->
+  <path class="edge" marker-end="url(#a)" d="M 160 224 L 160 300 Q 160 312 172 312 L 228 312"/>
+  <text class="mono xs" x="52" y="250">POST /api/gateway/purchase</text>
+  <text class="sans xs" x="52" y="264">a SKU and a quantity, nothing more</text>
+
+  <!-- mandate -> gateway -->
+  <path class="edge" marker-end="url(#a)" d="M 760 224 L 760 300 Q 760 312 748 312 L 692 312"/>
+  <text class="mono xs" x="700" y="250">re-read every attempt</text>
+  <text class="sans xs" x="700" y="264">status is never cached</text>
+
+  <!-- ===================== allow -> razorpay ===================== -->
+  <path class="edge-permit" marker-end="url(#ap)" d="M 345 506 L 345 546"/>
+  <text class="mono xs permit" x="355" y="530">ALLOW only</text>
+
+  <!-- ===================== razorpay + webhook ===================== -->
+  <rect class="box" x="230" y="548" width="240" height="66" rx="7"/>
+  <text class="mono eyebrow" x="248" y="570">TEST MODE ONLY</text>
+  <text class="sans b" x="248" y="590">Razorpay Orders, Payment Links</text>
+  <text class="sans m" x="248" y="606">live keys are refused outright</text>
+
+  <rect class="box" x="500" y="548" width="240" height="66" rx="7"/>
+  <text class="mono eyebrow" x="518" y="570">SETTLEMENT</text>
+  <text class="mono b" x="518" y="590">/api/webhooks/razorpay</text>
+  <text class="sans m" x="518" y="606">HMAC checked on raw bytes first</text>
+
+  <path class="edge" marker-end="url(#a)" d="M 470 581 L 498 581"/>
+  <text class="mono xs" x="464" y="572">order.paid</text>
+
+  <!-- ===================== ledger ===================== -->
+  <rect class="box" x="40" y="640" width="840" height="56" rx="7"/>
+  <text class="mono eyebrow" x="60" y="661">APPEND-ONLY · HASH-CHAINED · NEVER UPDATED, NEVER DELETED</text>
+  <text class="sans b" x="60" y="682">Audit ledger</text>
+  <text class="mono m" x="164" y="682">sha256(seq │ prevHash │ actor │ type │ verdict │ payload │ createdAt)</text>
+
+  <!-- every branch of the gateway appends, including the refusals -->
+  <path class="edge" marker-end="url(#a)" d="M 228 420 L 130 420 Q 118 420 118 432 L 118 626 Q 118 638 130 638"/>
+  <text class="sans xs" x="52" y="520">every decision,</text>
+  <text class="sans xs" x="52" y="533">allowed or refused</text>
+
+  <path class="edge" marker-end="url(#a)" d="M 300 614 L 300 638"/>
+  <path class="edge" marker-end="url(#a)" d="M 620 614 L 620 638"/>
+</svg>

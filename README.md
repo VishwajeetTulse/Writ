@@ -109,6 +109,7 @@ Anthropic key.
 | Settlement survives a dropped webhook | `npm run reconcile` | Pulls status from Razorpay and compares amounts |
 | Revocation lands on the next call | `npm run revoke:test` | Revokes mid-run, asserts the next attempt is refused |
 | The audit trail was not edited | `curl 'localhost:3000/api/ledger?verify=1'` | Rehashes the entire chain |
+| Every money action is explainable | `curl 'localhost:3000/api/explain?seq=42'` | Renders a recorded decision into prose, from its own arithmetic |
 
 ### Evaluation results
 
@@ -146,49 +147,7 @@ rather than hiding it.
 
 ## Architecture
 
-```
-   AI buyer                                        Human
-      │                                              │
-      │ GET /api/catalog          open, no auth      │ signs a mandate
-      │ GET /.well-known/agent-catalog.json          │ revokes it
-      │                                              ▼
-      │                                       ┌─────────────┐
-      │                                       │   Mandate   │ HMAC-SHA256 over
-      │                                       │   ACTIVE    │ canonical terms
-      │                                       └──────┬──────┘
-      │                                              │
-      ▼  POST /api/gateway/purchase                  │
-┌──────────────────────────────────────────┐         │
-│  GATEWAY  src/lib/gateway.ts             │◄────────┘
-│                                          │
-│  1  load mandate      never cached       │
-│  2  verify signature  terms vs HMAC      │
-│  3  price the SKU     from the catalog   │──── the agent's claimed
-│  4  evaluate ─────────┐                  │     amount is discarded here
-│  5  claim idem key    │  pure function   │
-│  6  call Razorpay     │  no I/O, no LLM  │
-│  7  append to ledger  │  ~5µs            │
-└───────────┬───────────┴──────────────────┘
-            │                    ▲
-            │ ALLOW only         │  BLOCK short-circuits before Razorpay
-            ▼                    │
-     ┌─────────────┐             │
-     │  Razorpay   │             │
-     │  test mode  │             │
-     └──────┬──────┘             │
-            │ order.paid         │
-            ▼                    │
-   POST /api/webhooks/razorpay   │
-   HMAC verified on raw bytes    │
-            │                    │
-            ▼                    │
-   ┌────────────────────────────────────┐
-   │  LEDGER  append-only, hash-chained │
-   │  sha256(seq│prevHash│…│payload)    │
-   │  every branch appends, refusals    │
-   │  included                          │
-   └────────────────────────────────────┘
-```
+![Writ architecture: an AI buyer reads an open catalog with no key, but must present a signed mandate to the gateway. The gateway loads the mandate fresh, verifies its signature, prices the SKU itself, evaluates a pure policy function, claims an idempotency key, and only then calls Razorpay. A block short-circuits before Razorpay is called. Every branch appends to an append-only hash-chained ledger.](docs/architecture.svg)
 
 The gateway is the only path to money. The agent holds no Razorpay credentials and
 cannot import the Razorpay client. In this prototype they share a process, so the
@@ -202,10 +161,19 @@ boundary is drawn at the HTTP route rather than by a network — see
 | Uses an LLM | Does not |
 |---|---|
 | Drafting a mandate from a sentence, then clamped by server-side ceilings and reviewed by a human before signing | The policy engine |
-| Explaining a verdict in prose, after the fact, from the recorded evidence | The gateway |
-| The buyer agent, which chooses what to shop for | Pricing |
+| The buyer agent, which chooses what to shop for | The gateway |
+| | Pricing |
 | | Signature verification |
+| | Explaining a verdict |
 | | The audit ledger |
+
+Explaining a verdict started out on the left of that table and moved right, which is
+worth a sentence. Every decision already carries its own arithmetic, because the engine
+records evidence rather than prose. Turning that into a sentence is rendering, not
+reasoning, and a model asked to do it can only introduce the possibility of saying
+something the numbers do not support. So `/api/explain` builds the sentence from the
+recorded evidence and the interface shows the reason code beside it. A model may later
+rephrase it, and the response says which version you are reading.
 
 The buyer pane in the console currently runs a **scripted buyer**, and says so on
 screen. That is deliberate rather than a placeholder apology. The claim Writ makes is
@@ -293,4 +261,6 @@ Fonts are Instrument Sans and IBM Plex Mono, and the split is load-bearing: anyt
 the machine computed is set in mono, anything a person wrote is sans. A reader can tell
 claims from evidence without reading a word.
 
-More detail in [`docs/webhooks.md`](docs/webhooks.md).
+More detail in [`docs/webhooks.md`](docs/webhooks.md). The five-minute demo script,
+with the real numbers a run produces, is in
+[`docs/demo-script.md`](docs/demo-script.md).
