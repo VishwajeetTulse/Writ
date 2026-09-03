@@ -50,6 +50,9 @@ export function RunConsole({ mandates }: { mandates: RunMandate[] }) {
   const [mandateId, setMandateId] = useState(active[0]?.id ?? mandates[0]?.id ?? "");
   const [goal, setGoal] = useState("Restock the weekly essentials.");
   const [chaos, setChaos] = useState(false);
+  const [pauseForRevocation, setPauseForRevocation] = useState(false);
+  const [revoking, setRevoking] = useState(false);
+  const [revoked, setRevoked] = useState(false);
 
   const [running, setRunning] = useState(false);
   const [runId, setRunId] = useState<string | null>(null);
@@ -91,6 +94,7 @@ export function RunConsole({ mandates }: { mandates: RunMandate[] }) {
     setAttempts([]);
     setEnded(null);
     setRunId(null);
+    setRevoked(false);
     setSpend({ spent: selected?.spentPaise ?? 0, cap: selected?.totalCapPaise ?? 0 });
 
     let seq = 0;
@@ -103,6 +107,7 @@ export function RunConsole({ mandates }: { mandates: RunMandate[] }) {
           mandateId,
           goal,
           chaos: chaos ? "razorpay_timeout" : null,
+          pauseForRevocation,
         }),
       });
 
@@ -147,6 +152,24 @@ export function RunConsole({ mandates }: { mandates: RunMandate[] }) {
       ]);
     } finally {
       setRunning(false);
+    }
+  }
+
+  /**
+   * Revoke while the run is still going.
+   *
+   * Nothing here talks to the run. It posts to the same endpoint the mandate screen
+   * uses, which flips one column. The run finds out the way anything else would: by
+   * asking the gateway for permission and being told no.
+   */
+  async function revokeNow() {
+    if (!mandateId) return;
+    setRevoking(true);
+    try {
+      const res = await fetch(`/api/mandates/${mandateId}/revoke`, { method: "POST" });
+      if (res.ok) setRevoked(true);
+    } finally {
+      setRevoking(false);
     }
   }
 
@@ -242,16 +265,32 @@ export function RunConsole({ mandates }: { mandates: RunMandate[] }) {
           </label>
 
           <div className="flex items-end gap-3">
-            <label className="flex items-center gap-2 pb-2.5">
-              <input
-                type="checkbox"
-                checked={chaos}
-                onChange={(e) => setChaos(e.target.checked)}
-                disabled={running}
-                className="h-3.5 w-3.5 accent-[#b4761a]"
-              />
-              <span className="text-[13px]">Inject a Razorpay timeout</span>
-            </label>
+            <div className="flex flex-col gap-1.5 pb-1.5">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={chaos}
+                  onChange={(e) => setChaos(e.target.checked)}
+                  disabled={running}
+                  className="h-3.5 w-3.5 accent-[#b4761a]"
+                />
+                <span className="whitespace-nowrap text-[13px]">
+                  Inject a Razorpay timeout
+                </span>
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={pauseForRevocation}
+                  onChange={(e) => setPauseForRevocation(e.target.checked)}
+                  disabled={running}
+                  className="h-3.5 w-3.5 accent-[#16161a]"
+                />
+                <span className="whitespace-nowrap text-[13px]">
+                  Pause so I can revoke
+                </span>
+              </label>
+            </div>
 
             <button
               onClick={run}
@@ -260,6 +299,22 @@ export function RunConsole({ mandates }: { mandates: RunMandate[] }) {
             >
               {running ? "Running…" : "Run"}
             </button>
+
+            {running && !revoked && (
+              <button
+                onClick={revokeNow}
+                disabled={revoking}
+                className="rounded-md border border-deny px-4 py-2.5 text-[14px] font-medium text-deny transition-colors hover:bg-deny-wash disabled:opacity-50"
+              >
+                {revoking ? "Revoking…" : "Revoke"}
+              </button>
+            )}
+
+            {revoked && (
+              <span className="inline-flex items-center rounded border border-deny/25 bg-deny-wash px-2.5 py-2 font-mono text-[11px] font-medium uppercase tracking-[0.06em] text-deny">
+                revoked
+              </span>
+            )}
           </div>
         </div>
 

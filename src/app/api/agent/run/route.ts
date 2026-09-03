@@ -18,7 +18,12 @@ import { isChaosMode } from "@/lib/razorpay/chaos";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
-  let body: { mandateId?: string; goal?: string; chaos?: string | null };
+  let body: {
+    mandateId?: string;
+    goal?: string;
+    chaos?: string | null;
+    pauseForRevocation?: boolean;
+  };
   try {
     body = (await request.json()) as typeof body;
   } catch {
@@ -44,7 +49,13 @@ export async function POST(request: Request) {
       };
 
       try {
-        await runScripted({ mandateId, goal, chaos, emit });
+        await runScripted({
+          mandateId,
+          goal,
+          chaos,
+          pauseForRevocation: body.pauseForRevocation === true,
+          emit,
+        });
       } catch (err) {
         // A run that dies mid-way still has to say so on the wire, or the console sits
         // there looking like it is thinking.

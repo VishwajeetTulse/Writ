@@ -30,11 +30,15 @@ interface Ctx {
   mandateId: string;
   goal: string;
   chaos?: ChaosMode | null;
+  /** Hold before the last purchase, so a human can revoke while the run is live. */
+  pauseForRevocation?: boolean;
   emit: (e: RunEvent) => void;
 }
 
 /** Pauses between steps. A run that completes instantly is unreadable on a projector. */
 const BEAT_MS = 550;
+/** Long enough for a human to find the button and click it, short enough to sit through. */
+const REVOKE_PAUSE_MS = 9000;
 const beat = (ms = BEAT_MS) => new Promise((r) => setTimeout(r, ms));
 
 export async function runScripted(ctx: Ctx) {
@@ -239,6 +243,44 @@ export async function runScripted(ctx: Ctx) {
     await beat(700);
   }
 
+  // --- 4. Revocation, mid-run ------------------------------------------------
+  // The pause is opt-in and announced, because the interesting part is not the waiting
+  // — it is that nothing is coordinated. Revoking flips one column. The gateway reads
+  // mandate status fresh on every attempt and never caches it, so the very next tool
+  // call finds no authority, with no message sent to the buyer and no run to interrupt.
+  if (ctx.pauseForRevocation && inScope.length > 0) {
+    emit({
+      type: "note",
+      tone: "warn",
+      text:
+        `Holding for ${Math.round(REVOKE_PAUSE_MS / 1000)} seconds before one last ` +
+        `purchase. Revoke the mandate now and watch it land on the next attempt.`,
+    });
+    await beat(REVOKE_PAUSE_MS);
+
+    const last = inScope[inScope.length - 1];
+    emit({ type: "plan", text: `Buying one more: ${last.name}.` });
+    await beat(300);
+
+    const { result } = await attempt(
+      last.sku,
+      last.name,
+      last.merchantName,
+      Number(last.pricePaise),
+    );
+
+    if (result.reasonCode === "MANDATE_REVOKED") {
+      emit({
+        type: "note",
+        text:
+          "Refused. Nothing was sent to the buyer and no run was interrupted — the " +
+          "gateway simply re-read the mandate, as it does on every attempt, and found " +
+          "it revoked.",
+      });
+      await beat(700);
+    }
+  }
+
   const summary = await getMandateSummary(mandateId);
   const spentPaise = Number(summary?.spentPaise ?? 0n);
 
@@ -249,16 +291,21 @@ export async function runScripted(ctx: Ctx) {
       `${blocked} refused. Every line above is in the hash-chained ledger.`,
   });
 
+  // A run whose mandate was pulled out from under it did not "complete" in any
+  // meaningful sense, and the ledger should not claim it did.
+  const finalStatus =
+    (await loadMandate(mandateId))?.status === "REVOKED" ? "HALTED_REVOKED" : "COMPLETED";
+
   await endRun({
     runId,
     mandateId,
-    status: "COMPLETED",
+    status: finalStatus,
     summary: { attempted, allowed, blocked, spentPaise, recoveredFailures },
   });
 
   emit({
     type: "run_ended",
-    status: "COMPLETED",
+    status: finalStatus,
     summary: { attempted, allowed, blocked, spentPaise, recoveredFailures },
   });
 }
