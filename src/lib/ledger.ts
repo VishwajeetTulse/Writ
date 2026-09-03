@@ -211,3 +211,34 @@ export async function verifyChain(): Promise<ChainVerification> {
 
   return { valid: true, recordCount: events.length };
 }
+
+export interface LedgerQuery {
+  mandateId?: string;
+  runId?: string;
+  verdict?: Verdict;
+  type?: EventType;
+  /** Return only rows newer than this sequence number. Used for live tailing. */
+  afterSeq?: number;
+  limit?: number;
+}
+
+/**
+ * Read the ledger.
+ *
+ * Ordered by `seq` because that is the chain's order. Sorting by timestamp would look
+ * equivalent and quietly is not: two events written in the same millisecond have a
+ * defined position in the chain and an undefined position by clock.
+ */
+export async function queryLedger(q: LedgerQuery = {}) {
+  return prisma.auditEvent.findMany({
+    where: {
+      ...(q.mandateId ? { mandateId: q.mandateId } : {}),
+      ...(q.runId ? { runId: q.runId } : {}),
+      ...(q.verdict ? { verdict: q.verdict } : {}),
+      ...(q.type ? { type: q.type } : {}),
+      ...(q.afterSeq !== undefined ? { seq: { gt: q.afterSeq } } : {}),
+    },
+    orderBy: { seq: q.afterSeq !== undefined ? "asc" : "desc" },
+    take: q.limit ?? 100,
+  });
+}

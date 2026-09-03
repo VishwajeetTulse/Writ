@@ -209,3 +209,126 @@ export async function getMandateSummary(mandateId: string) {
     blockCount: blocks,
   };
 }
+
+/** Status as it is *now*, not as the row last recorded it. */
+export function effectiveStatus(row: {
+  status: string;
+  expiresAt: Date;
+}): MandateStatus {
+  const status = row.status as MandateStatus;
+  if (status === "ACTIVE" && new Date() >= row.expiresAt) return "EXPIRED";
+  return status;
+}
+
+export interface MandateListItem {
+  id: string;
+  intentText: string;
+  status: MandateStatus;
+  merchants: MandateMerchant[];
+  categories: string[];
+  perTxnCapPaise: bigint;
+  totalCapPaise: bigint;
+  spentPaise: bigint;
+  remainingPaise: bigint;
+  velocityMax: number | null;
+  velocityWindowS: number | null;
+  purchaseCount: number;
+  blockCount: number;
+  /** The largest single refused amount, for the runway's breach marker. */
+  largestBlockedPaise: bigint;
+  expiresAt: Date;
+  createdAt: Date;
+  signature: string;
+}
+
+/**
+ * Every mandate with its spend rolled up.
+ *
+ * Three aggregate queries rather than one per mandate: the list screen is the first
+ * thing a judge sees, and it should not get slower as the demo produces more data.
+ */
+export async function listMandates(): Promise<MandateListItem[]> {
+  const [rows, spend, blocks] = await Promise.all([
+    prisma.mandate.findMany({ orderBy: { createdAt: "desc" } }),
+    prisma.purchase.groupBy({
+      by: ["mandateId"],
+      where: { status: { in: ["CREATED", "PAID"] } },
+      _sum: { amountPaise: true },
+      _count: { _all: true },
+    }),
+    prisma.auditEvent.groupBy({
+      by: ["mandateId"],
+      where: { verdict: "BLOCK" },
+      _count: { _all: true },
+      _max: { amountPaise: true },
+    }),
+  ]);
+
+  const spendBy = new Map(spend.map((s) => [s.mandateId, s]));
+  const blockBy = new Map(blocks.map((b) => [b.mandateId, b]));
+
+  return rows.map((row) => {
+    const s = spendBy.get(row.id);
+    const b = blockBy.get(row.id);
+    const spentPaise = s?._sum.amountPaise ?? 0n;
+
+    return {
+      id: row.id,
+      intentText: row.intentText,
+      status: effectiveStatus(row),
+      merchants: JSON.parse(row.merchants) as MandateMerchant[],
+      categories: JSON.parse(row.categories) as string[],
+      perTxnCapPaise: row.perTxnCapPaise,
+      totalCapPaise: row.totalCapPaise,
+      spentPaise,
+      remainingPaise: row.totalCapPaise - spentPaise,
+      velocityMax: row.velocityMax,
+      velocityWindowS: row.velocityWindowS,
+      purchaseCount: s?._count._all ?? 0,
+      blockCount: b?._count._all ?? 0,
+      largestBlockedPaise: b?._max.amountPaise ?? 0n,
+      expiresAt: row.expiresAt,
+      createdAt: row.createdAt,
+      signature: row.signature,
+    };
+  });
+}
+
+/**
+ * One mandate with everything the detail screen and the API both need.
+ *
+ * `signatureValid` is recomputed here rather than stored. A stored "yes, this was
+ * valid once" is worth nothing — the check has to run against the row as it exists
+ * right now, which is the only way editing a cap in the database shows up as tampering.
+ */
+export async function getMandateDetail(id: string) {
+  const loaded = await loadMandate(id);
+  if (!loaded) return null;
+
+  const [purchases, refusals, summary] = await Promise.all([
+    prisma.purchase.findMany({
+      where: { mandateId: id },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+    }),
+    prisma.auditEvent.findMany({
+      where: { mandateId: id, verdict: "BLOCK" },
+      orderBy: { seq: "desc" },
+      take: 20,
+    }),
+    getMandateSummary(id),
+  ]);
+
+  return {
+    row: loaded.row,
+    terms: loaded.terms,
+    status: loaded.status,
+    signatureValid: loaded.signatureValid,
+    purchases,
+    refusals,
+    spentPaise: summary?.spentPaise ?? 0n,
+    remainingPaise: summary?.remainingPaise ?? loaded.row.totalCapPaise,
+    purchaseCount: summary?.purchaseCount ?? 0,
+    blockCount: summary?.blockCount ?? 0,
+  };
+}

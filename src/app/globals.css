@@ -1,26 +1,65 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/*
+ * Writ's design system.
+ *
+ * One rule drives all of it: the machine speaks in mono, the human speaks in sans.
+ * Anything the system decided — a verdict, a reason code, an amount, a hash, a
+ * latency — is set in IBM Plex Mono, because it is a value that was computed and can
+ * be checked. Anything a person wrote or reads as prose is Instrument Sans.
+ *
+ * A judge should be able to tell, at a glance and without reading a word, which parts
+ * of this screen are claims and which are evidence.
+ *
+ * Deliberately light-only. This is a console shown on a projector under conference
+ * lighting, and a theme that follows the viewer's OS is a way to lose the demo.
+ */
+
+@theme {
+  --color-ground: #f7f7f5;
+  --color-surface: #ffffff;
+  --color-line: #e4e4e0;
+  --color-line-strong: #c9c9c2;
+  --color-ink: #16161a;
+  --color-ink-mute: #6b6b73;
+
+  /* The three verdicts. Never used decoratively — a colour here always means a
+     decision the policy engine made. */
+  --color-permit: #0f7a5a;
+  --color-permit-wash: #e8f3ef;
+  --color-deny: #c7361f;
+  --color-deny-wash: #fbecea;
+  --color-hold: #b4761a;
+  --color-hold-wash: #fbf2e4;
+
+  --font-sans: var(--font-instrument-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, "SF Mono", Menlo, monospace;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  color-scheme: light;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-ground);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-feature-settings: "cv05" 1;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Tabular figures everywhere money or a count appears, so digits line up in columns
+   and a number that changes does not make the layout twitch. */
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+/* The one-line label above a value. Small, wide, quiet. */
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--color-ink-mute);
 }
