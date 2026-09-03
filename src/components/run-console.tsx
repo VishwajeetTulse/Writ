@@ -1,0 +1,436 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import type { RunEvent } from "@/lib/agent/events";
+import { formatPaise } from "@/lib/money";
+import { Runway } from "@/components/runway";
+import { VerdictPill } from "@/components/verdict";
+import { Card } from "@/components/ui";
+
+/**
+ * The run console.
+ *
+ * Two panes, and the split is the argument. On the left is what the buyer did — its
+ * reasoning, its choices, the text it read. On the right is what the gateway decided.
+ * Nothing crosses from left to right except a SKU and a quantity; the amount, the
+ * merchant, the category and the verdict are all derived on the right from data the
+ * left-hand side cannot write.
+ *
+ * The runway sits above both because it is the only thing in the room that is true
+ * regardless of which pane you believe.
+ */
+
+export interface RunMandate {
+  id: string;
+  intentText: string;
+  status: string;
+  totalCapPaise: number;
+  spentPaise: number;
+}
+
+interface AttemptRow {
+  key: string;
+  sku: string;
+  productName: string;
+  merchantName: string;
+  amountPaise: number;
+  decision?: Extract<RunEvent, { type: "decision" }>;
+}
+
+interface Narration {
+  key: string;
+  kind: "plan" | "note";
+  text: string;
+  tone?: "plain" | "warn";
+}
+
+export function RunConsole({ mandates }: { mandates: RunMandate[] }) {
+  const active = mandates.filter((m) => m.status === "ACTIVE");
+  const [mandateId, setMandateId] = useState(active[0]?.id ?? mandates[0]?.id ?? "");
+  const [goal, setGoal] = useState("Restock the weekly essentials.");
+  const [chaos, setChaos] = useState(false);
+
+  const [running, setRunning] = useState(false);
+  const [runId, setRunId] = useState<string | null>(null);
+  const [narration, setNarration] = useState<Narration[]>([]);
+  const [attempts, setAttempts] = useState<AttemptRow[]>([]);
+  const [spend, setSpend] = useState<{ spent: number; cap: number } | null>(null);
+  const [ended, setEnded] = useState<Extract<RunEvent, { type: "run_ended" }> | null>(
+    null,
+  );
+
+  const selected = mandates.find((m) => m.id === mandateId);
+  const leftRef = useRef<HTMLDivElement>(null);
+  const rightRef = useRef<HTMLDivElement>(null);
+
+  // Follow the tail of both panes as events land, so the newest line is always the one
+  // on screen without anyone having to scroll during a demo.
+  useEffect(() => {
+    leftRef.current?.scrollTo({ top: leftRef.current.scrollHeight, behavior: "smooth" });
+  }, [narration]);
+  useEffect(() => {
+    rightRef.current?.scrollTo({ top: rightRef.current.scrollHeight, behavior: "smooth" });
+  }, [attempts]);
+
+  // The last refusal breaches the wall on the runway. The largest one is chosen rather
+  // than the most recent, because the biggest thing this mandate stopped is the fact
+  // worth keeping on screen.
+  const worstBlock = attempts
+    .filter((a) => a.decision && a.decision.verdict !== "ALLOW")
+    .reduce<AttemptRow | null>(
+      (max, a) => (!max || a.amountPaise > max.amountPaise ? a : max),
+      null,
+    );
+
+  async function run() {
+    if (!mandateId) return;
+
+    setRunning(true);
+    setNarration([]);
+    setAttempts([]);
+    setEnded(null);
+    setRunId(null);
+    setSpend({ spent: selected?.spentPaise ?? 0, cap: selected?.totalCapPaise ?? 0 });
+
+    let seq = 0;
+
+    try {
+      const res = await fetch("/api/agent/run", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          mandateId,
+          goal,
+          chaos: chaos ? "razorpay_timeout" : null,
+        }),
+      });
+
+      if (!res.body) throw new Error("No stream returned.");
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const frames = buffer.split("\n\n");
+        buffer = frames.pop() ?? "";
+
+        for (const frame of frames) {
+          const line = frame.split("\n").find((l) => l.startsWith("data: "));
+          if (!line) continue;
+
+          let event: RunEvent;
+          try {
+            event = JSON.parse(line.slice(6)) as RunEvent;
+          } catch {
+            continue;
+          }
+
+          seq++;
+          apply(event, seq);
+        }
+      }
+    } catch (err) {
+      setNarration((n) => [
+        ...n,
+        {
+          key: `err_${Date.now()}`,
+          kind: "note",
+          tone: "warn",
+          text: err instanceof Error ? err.message : "The run could not be started.",
+        },
+      ]);
+    } finally {
+      setRunning(false);
+    }
+  }
+
+  function apply(event: RunEvent, seq: number) {
+    switch (event.type) {
+      case "run_started":
+        setRunId(event.runId);
+        break;
+
+      case "plan":
+        setNarration((n) => [
+          ...n,
+          { key: `p${seq}`, kind: "plan", text: event.text },
+        ]);
+        break;
+
+      case "note":
+        setNarration((n) => [
+          ...n,
+          { key: `n${seq}`, kind: "note", text: event.text, tone: event.tone },
+        ]);
+        break;
+
+      case "attempt":
+        setAttempts((a) => [
+          ...a,
+          {
+            key: `a${seq}`,
+            sku: event.sku,
+            productName: event.productName,
+            merchantName: event.merchantName,
+            amountPaise: event.amountPaise,
+          },
+        ]);
+        break;
+
+      case "decision":
+        setAttempts((a) => {
+          const next = [...a];
+          for (let i = next.length - 1; i >= 0; i--) {
+            if (next[i].sku === event.sku && !next[i].decision) {
+              next[i] = {
+                ...next[i],
+                amountPaise: event.amountPaise,
+                decision: event,
+              };
+              break;
+            }
+          }
+          return next;
+        });
+        break;
+
+      case "spend":
+        setSpend({ spent: event.spentPaise, cap: event.capPaise });
+        break;
+
+      case "run_ended":
+        setEnded(event);
+        break;
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* ------------------------------------------------------------- controls */}
+      <Card>
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,260px)_minmax(0,1fr)_auto] lg:items-end">
+          <label className="block">
+            <span className="eyebrow">Mandate</span>
+            <select
+              value={mandateId}
+              onChange={(e) => setMandateId(e.target.value)}
+              disabled={running}
+              className="mt-1.5 w-full rounded-md border border-line bg-surface px-3 py-2 font-mono text-[13px] outline-none focus:border-ink-mute disabled:opacity-60"
+            >
+              {mandates.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.id} · {m.status}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="block">
+            <span className="eyebrow">Goal given to the buyer</span>
+            <input
+              value={goal}
+              onChange={(e) => setGoal(e.target.value)}
+              disabled={running}
+              className="mt-1.5 w-full rounded-md border border-line bg-surface px-3 py-2 text-[14px] outline-none focus:border-ink-mute disabled:opacity-60"
+            />
+          </label>
+
+          <div className="flex items-end gap-3">
+            <label className="flex items-center gap-2 pb-2.5">
+              <input
+                type="checkbox"
+                checked={chaos}
+                onChange={(e) => setChaos(e.target.checked)}
+                disabled={running}
+                className="h-3.5 w-3.5 accent-[#b4761a]"
+              />
+              <span className="text-[13px]">Inject a Razorpay timeout</span>
+            </label>
+
+            <button
+              onClick={run}
+              disabled={running || !mandateId}
+              className="rounded-md bg-ink px-5 py-2.5 text-[14px] font-medium text-surface transition-opacity hover:opacity-88 disabled:opacity-40"
+            >
+              {running ? "Running…" : "Run"}
+            </button>
+          </div>
+        </div>
+
+        {selected && selected.status !== "ACTIVE" && (
+          <p className="mt-3 rounded-md border border-hold/25 bg-hold-wash px-3 py-2 text-[13px] text-hold">
+            This mandate is {selected.status.toLowerCase()}. Every attempt will be
+            refused, which is worth watching at least once.
+          </p>
+        )}
+      </Card>
+
+      {/* -------------------------------------------------------------- runway */}
+      <Card>
+        <Runway
+          capPaise={spend?.cap ?? selected?.totalCapPaise ?? 0}
+          spentPaise={spend?.spent ?? selected?.spentPaise ?? 0}
+          blockedPaise={worstBlock?.amountPaise ?? null}
+          blockedLabel={worstBlock ? `${worstBlock.productName} refused` : null}
+        />
+      </Card>
+
+      {/* ----------------------------------------------------------- the panes */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card pad={false} className="flex h-[520px] flex-col">
+          <div className="flex items-baseline justify-between border-b border-line px-5 py-3.5">
+            <h2 className="text-[13px] font-semibold">Buyer</h2>
+            <span className="font-mono text-[10px] uppercase tracking-[0.06em] text-ink-mute">
+              scripted · no model
+            </span>
+          </div>
+
+          <div ref={leftRef} className="flex-1 space-y-3 overflow-y-auto px-5 py-4">
+            {narration.length === 0 && (
+              <p className="pt-16 text-center text-[13px] text-ink-mute">
+                What the buyer decides to do appears here. None of it is trusted.
+              </p>
+            )}
+            {narration.map((n) => (
+              <p
+                key={n.key}
+                className={`text-[13px] leading-relaxed ${
+                  n.kind === "plan"
+                    ? "text-ink"
+                    : n.tone === "warn"
+                      ? "rounded-md border border-hold/25 bg-hold-wash px-3 py-2 text-hold"
+                      : "border-l-2 border-line pl-3 text-ink-mute"
+                }`}
+              >
+                {n.text}
+              </p>
+            ))}
+          </div>
+
+          <p className="border-t border-line px-5 py-3 text-[12px] leading-relaxed text-ink-mute">
+            This pane is a scripted sequence, not a language model. It gets the same
+            verdicts a model would, because the gateway does not care which one is
+            asking.
+          </p>
+        </Card>
+
+        <Card pad={false} className="flex h-[520px] flex-col">
+          <div className="flex items-baseline justify-between border-b border-line px-5 py-3.5">
+            <h2 className="text-[13px] font-semibold">Gateway</h2>
+            <span className="font-mono text-[10px] uppercase tracking-[0.06em] text-ink-mute">
+              {runId ?? "idle"}
+            </span>
+          </div>
+
+          <div ref={rightRef} className="flex-1 overflow-y-auto">
+            {attempts.length === 0 ? (
+              <p className="px-5 pt-16 text-center text-[13px] text-ink-mute">
+                Every verdict is decided here, from the catalog price and the signed
+                terms.
+              </p>
+            ) : (
+              <ul className="divide-y divide-line">
+                {attempts.map((a) => (
+                  <li key={a.key} className="px-5 py-3.5">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span className="truncate text-[13px]">{a.productName}</span>
+                      <span className="shrink-0 font-mono text-[13px] tnum">
+                        {formatPaise(BigInt(Math.round(a.amountPaise)))}
+                      </span>
+                    </div>
+
+                    <div className="mt-0.5 truncate font-mono text-[10px] text-ink-mute">
+                      {a.merchantName} · {a.sku}
+                    </div>
+
+                    {a.decision ? (
+                      <>
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          <VerdictPill verdict={a.decision.verdict} />
+                          {a.decision.reasonCode && (
+                            <span className="font-mono text-[11px] font-medium">
+                              {a.decision.reasonCode}
+                            </span>
+                          )}
+                          <span className="ml-auto font-mono text-[10px] tnum text-ink-mute">
+                            {(a.decision.latencyUs / 1000).toFixed(2)}ms
+                          </span>
+                        </div>
+
+                        {a.decision.violations.length > 1 && (
+                          <div className="mt-1.5 rounded border border-deny/20 bg-deny-wash px-2 py-1.5">
+                            <span className="font-mono text-[10px] uppercase tracking-[0.06em] text-deny">
+                              {a.decision.violations.length} bounds broken at once
+                            </span>
+                            <div className="mt-1 font-mono text-[10px] leading-relaxed text-deny/85">
+                              {a.decision.violations.map((v) => v.reasonCode).join("  ·  ")}
+                            </div>
+                          </div>
+                        )}
+
+                        {a.decision.recovered && (
+                          <div className="mt-1.5 rounded border border-hold/25 bg-hold-wash px-2 py-1.5 text-[11px] leading-relaxed text-hold">
+                            Razorpay failed ({a.decision.recovered.failure}) and the call
+                            was retried with the same idempotency key. One order, one
+                            charge.
+                          </div>
+                        )}
+
+                        {a.decision.razorpayOrderId && (
+                          <div className="mt-1.5 font-mono text-[10px] text-ink-mute">
+                            {a.decision.razorpayOrderId}
+                            {a.decision.paymentLinkUrl && (
+                              <>
+                                {" · "}
+                                <a
+                                  href={a.decision.paymentLinkUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-ink underline underline-offset-2"
+                                >
+                                  payment link
+                                </a>
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="mt-2 font-mono text-[10px] uppercase tracking-[0.06em] text-ink-mute">
+                        deciding…
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          {ended && (
+            <div className="flex items-center gap-4 border-t border-line px-5 py-3 font-mono text-[11px] tnum">
+              <span className="text-permit">{ended.summary.allowed} allowed</span>
+              <span className="text-deny">{ended.summary.blocked} refused</span>
+              <span className="text-ink-mute">
+                {formatPaise(BigInt(Math.round(ended.summary.spentPaise)))} spent
+              </span>
+              {runId && (
+                <Link
+                  href={`/ledger?mandate=${mandateId}`}
+                  className="ml-auto text-ink underline underline-offset-2"
+                >
+                  See the trail
+                </Link>
+              )}
+            </div>
+          )}
+        </Card>
+      </div>
+    </div>
+  );
+}

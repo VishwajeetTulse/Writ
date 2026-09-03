@@ -39,6 +39,9 @@ export interface FormMerchant {
   category: string;
 }
 
+/** The reference instant the preview measures from. See `previewExpiresAt` below. */
+const PREVIEW_NOW = new Date(0);
+
 const DURATIONS = [
   { label: "6 hours", hours: 6 },
   { label: "24 hours", hours: 24 },
@@ -70,6 +73,7 @@ export function MandateForm({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+
   const allCategories = useMemo(
     () => Array.from(new Set(products.map((p) => p.category))).sort(),
     [products],
@@ -83,8 +87,12 @@ export function MandateForm({
     [merchants, merchantIds],
   );
 
-  const expiresAt = useMemo(
-    () => new Date(Date.now() + hours * 3600_000).toISOString(),
+  // The preview answers "what does this permit the moment it is signed", so it needs
+  // no clock at all — only the gap between issue and expiry. Both sides are measured
+  // from the same reference instant, which keeps this component a pure function of its
+  // inputs and its verdicts reproducible. The real expiry is stamped at submit time.
+  const previewExpiresAt = useMemo(
+    () => new Date(hours * 3600_000).toISOString(),
     [hours],
   );
 
@@ -99,9 +107,18 @@ export function MandateForm({
       totalCapPaise: BigInt(Math.round(total * 100)),
       velocityMax: velocityOn ? velocityMax : null,
       velocityWindowS: velocityOn ? velocityWindowS : null,
-      expiresAt,
+      expiresAt: previewExpiresAt,
     }),
-    [selectedMerchants, categories, perTxn, total, velocityOn, velocityMax, velocityWindowS, expiresAt],
+    [
+      selectedMerchants,
+      categories,
+      perTxn,
+      total,
+      velocityOn,
+      velocityMax,
+      velocityWindowS,
+      previewExpiresAt,
+    ],
   );
 
   /**
@@ -125,6 +142,7 @@ export function MandateForm({
         context,
         { spentPaise: 0n, recentPurchaseTimes: [], idempotencyKeyUsed: false },
         action,
+        PREVIEW_NOW,
       );
 
       return { product: p, decision };
@@ -147,6 +165,9 @@ export function MandateForm({
   async function submit() {
     setSubmitting(true);
     setError(null);
+    // Read the clock here rather than from state: an expiry computed at page load and
+    // signed ten minutes later is ten minutes short of what the operator chose.
+    const signedExpiresAt = new Date(Date.now() + hours * 3600_000).toISOString();
     try {
       const res = await fetch("/api/mandates", {
         method: "POST",
@@ -159,7 +180,7 @@ export function MandateForm({
           totalCapRupees: total,
           velocityMax: velocityOn ? velocityMax : null,
           velocityWindowS: velocityOn ? velocityWindowS : null,
-          expiresAt,
+          expiresAt: signedExpiresAt,
         }),
       });
 
