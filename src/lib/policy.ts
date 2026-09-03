@@ -129,6 +129,24 @@ export interface PolicyDecision {
 }
 
 /**
+ * A nanosecond clock that works wherever this function does.
+ *
+ * `process.hrtime.bigint()` is the precise option and it is what the server uses, which
+ * is where the latency figures in the evaluation suite come from. But this function is
+ * deliberately free of I/O so that it can also run in the browser — the new-mandate
+ * screen previews a mandate by evaluating the real engine against the live catalog —
+ * and browsers have no `process`. Reaching for it unconditionally is what broke that
+ * screen.
+ *
+ * Only the measurement differs between the two. The verdict does not: nothing below
+ * reads the clock except to time itself.
+ */
+const nanoseconds: () => bigint =
+  typeof process !== "undefined" && typeof process.hrtime?.bigint === "function"
+    ? () => process.hrtime.bigint()
+    : () => BigInt(Math.round(performance.now() * 1_000_000));
+
+/**
  * Judge one proposed action against one mandate.
  *
  * Check order is deliberate and load-bearing: authenticity first (is this mandate real?),
@@ -145,9 +163,9 @@ export function evaluate(
   action: ProposedAction,
   now: Date = new Date(),
 ): PolicyDecision {
-  const startedAt = process.hrtime.bigint();
+  const startedAt = nanoseconds();
 
-  const elapsedUs = () => Number((process.hrtime.bigint() - startedAt) / 1000n);
+  const elapsedUs = () => Number((nanoseconds() - startedAt) / 1000n);
 
   /**
    * A gate: a condition that means there is no authority here at all.
@@ -235,6 +253,9 @@ export function evaluate(
     violated("MERCHANT_NOT_ALLOWED", {
       attemptedMerchant: action.merchantId,
       allowedMerchants: terms.merchants.map((m) => m.id),
+      // Names as well as ids, so a refusal can be explained to the person whose money
+      // it is without a second lookup. Ids stay first — they are what is compared.
+      allowedMerchantNames: terms.merchants.map((m) => m.name),
     });
   }
 

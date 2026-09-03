@@ -225,6 +225,21 @@ All money is integer paise in `bigint`. There is no float anywhere in the money 
 
 Stated plainly, because a security claim with unstated boundaries is worth nothing.
 
+- **An order is not a settled payment, and there is no payment instrument.** This is
+  the boundary worth understanding before anything else. A mandate answers *how much,
+  where, and until when*. A payment instrument answers *how the money actually travels*.
+  Writ implements the first layer for real and does not implement the second. An allowed
+  purchase creates a genuine Razorpay order, which is a server-side authorisation to
+  collect; settling it needs an instrument, and provisioning one is out of scope here.
+
+  In production the two compose, and the composition is the whole point: the human
+  registers a pre-authorised instrument once — a UPI Autopay or e-mandate debit — at the
+  same moment they sign the mandate, and the agent then spends against both with nobody
+  tapping anything again. That is also why there is deliberately **no payment link on
+  the agent path**. A link is a hosted page a person opens and pays, and a person
+  approving each purchase at a checkout is precisely the slow checkout this exists to
+  replace. The gateway can still create one behind an explicit flag, for a
+  human-present checkout, which is a different use.
 - **The gateway shares a process with the agent.** The boundary is drawn at the HTTP
   route, not by a network. Moving the gateway to its own service is a deployment change
   rather than a rewrite, but it has not been done.

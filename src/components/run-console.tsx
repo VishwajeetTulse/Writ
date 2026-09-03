@@ -83,7 +83,7 @@ function DecisionExplanation({
 
   return (
     <div className="mt-2 rounded border border-line bg-ground/70 px-2.5 py-2">
-      <p className="text-[12px] leading-relaxed">{explanation.text}</p>
+      <p className="text-[13px] leading-relaxed">{explanation.text}</p>
 
       {explanation.facts.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5">
@@ -94,6 +94,12 @@ function DecisionExplanation({
             </div>
           ))}
         </div>
+      )}
+
+      {explanation.mechanism && (
+        <p className="mt-2 border-t border-line pt-2 text-[11px] leading-relaxed text-ink-mute">
+          <span className="eyebrow">How it was enforced</span> {explanation.mechanism}
+        </p>
       )}
 
       <button
@@ -549,6 +555,42 @@ export function RunConsole({ mandates }: { mandates: RunMandate[] }) {
           )}
         </Card>
       </div>
+
+      {/* The boundary of what this prototype implements, stated on the screen rather
+          than only in the README. It is the first question anyone sensible asks. */}
+      <Card>
+        <h2 className="mb-2 text-[13px] font-semibold">
+          What an order here is, and what it is not
+        </h2>
+        <div className="max-w-[92ch] space-y-2.5 text-[13px] leading-relaxed text-ink-mute">
+          <p>
+            Each allowed purchase above creates a real Razorpay order. An order is a
+            server-side authorisation to collect a specific amount from a specific buyer.
+            It is not a completed payment, and money has not moved.
+          </p>
+          <p>
+            Moving it needs a payment instrument, and that is a separate layer from the
+            one Writ implements. A mandate answers{" "}
+            <span className="text-ink">how much, where, and until when</span>. An
+            instrument answers <span className="text-ink">how the money actually
+            travels</span>. In production the two compose: the human registers a
+            pre-authorised instrument once, a UPI Autopay or e-mandate debit, at the same
+            moment they sign the mandate. The agent then spends against both without
+            anyone tapping anything again.
+          </p>
+          <p>
+            So there is deliberately no payment link in this run. A link is a hosted page
+            a person opens and pays, and a person approving each purchase at a checkout is
+            exactly the slow checkout this exists to replace. Putting one on the agent
+            path would contradict the product.
+          </p>
+          <p>
+            What the prototype implements for real is the scope layer: the signing, the
+            enforcement, the refusals and the audit trail. Instrument provisioning is
+            stated as a limitation in the README rather than simulated here.
+          </p>
+        </div>
+      </Card>
     </div>
   );
 }

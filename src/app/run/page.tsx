@@ -19,7 +19,7 @@ export default async function RunPage() {
     <Page
       wide
       title="Agent run"
-      lede="A buyer shops against a mandate. Everything it proposes goes through the gateway, which prices the item from the catalog, evaluates the signed terms, and only then reaches Razorpay. Refusals are recorded exactly like purchases."
+      lede="A buyer shops against a mandate. Everything it proposes goes through the gateway, which prices the item from the catalog, evaluates the signed terms, and only then reaches Razorpay. Refusals are recorded exactly like purchases. Each allowed purchase creates a real Razorpay order, which is an authorisation to collect rather than a completed payment — see the note below the panes."
     >
       {mandates.length === 0 ? (
         <Empty>

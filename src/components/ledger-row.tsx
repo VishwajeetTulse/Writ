@@ -13,9 +13,13 @@ import type { Verdict } from "@/lib/policy";
  * thing that satisfies "every money action is explainable", and a UI that quietly
  * bypasses it would leave the claim resting on a code path nobody exercises.
  *
- * The expanded panel always shows the sentence, the arithmetic it was rendered from,
- * and the raw reason code together. A paraphrase you cannot check against the original
- * is a claim, not an explanation.
+ * The panel is ordered by who is reading it. The plain sentence comes first, because
+ * the person most likely to open this row is whoever's money it is, and they need shop
+ * names and rupees rather than reason codes. The mechanism and the machine code sit
+ * below it for an engineer or an auditor, who are the only readers those serve.
+ *
+ * Both are shown rather than one or the other. A paraphrase you cannot check against
+ * the original is a claim, not an explanation.
  */
 
 export interface LedgerRowData {
@@ -144,10 +148,10 @@ export function LedgerRow({ row }: { row: LedgerRowData }) {
 
             {explanation && (
               <div className="max-w-[92ch]">
-                <p className="text-[14px] leading-relaxed">{explanation.text}</p>
+                <p className="text-[15px] leading-relaxed">{explanation.text}</p>
 
                 {explanation.facts.length > 0 && (
-                  <div className="mt-3 flex flex-wrap gap-x-6 gap-y-2">
+                  <div className="mt-3.5 flex flex-wrap gap-x-6 gap-y-2">
                     {explanation.facts.map((f) => (
                       <div key={f.label}>
                         <div className="eyebrow">{f.label}</div>
@@ -157,18 +161,28 @@ export function LedgerRow({ row }: { row: LedgerRowData }) {
                   </div>
                 )}
 
-                <p className="mt-3 border-t border-line pt-2.5 text-[11px] leading-relaxed text-ink-mute">
-                  Rendered from the evidence recorded at decision time. No model was
-                  involved, so the sentence cannot say anything the arithmetic does not.
-                  {explanation.reasonCode && (
-                    <>
-                      {" "}
-                      Machine code:{" "}
-                      <span className="font-mono text-ink">{explanation.reasonCode}</span>
-                      {explanation.reasonLabel ? ` — ${explanation.reasonLabel}.` : "."}
-                    </>
+                <div className="mt-4 border-t border-line pt-3">
+                  {explanation.mechanism && (
+                    <p className="text-[12px] leading-relaxed text-ink-mute">
+                      <span className="eyebrow">How it was enforced</span>{" "}
+                      {explanation.mechanism}
+                    </p>
                   )}
-                </p>
+
+                  <p className="mt-2 text-[11px] leading-relaxed text-ink-mute">
+                    {explanation.reasonCode && (
+                      <>
+                        Machine code{" "}
+                        <span className="font-mono text-ink">
+                          {explanation.reasonCode}
+                        </span>
+                        {explanation.reasonLabel ? `, ${explanation.reasonLabel}. ` : ". "}
+                      </>
+                    )}
+                    Rendered from the evidence recorded at decision time, with no model
+                    involved, so the wording cannot say anything the numbers do not.
+                  </p>
+                </div>
               </div>
             )}
           </td>

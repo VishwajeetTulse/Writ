@@ -97,6 +97,14 @@ curl -s localhost:3000/api/catalog | head -40
 *Cut to the Razorpay dashboard tab. Match one order id on screen. Five seconds.*
 
 > There they are in the dashboard. Test mode, but a real integration.
+>
+> And to be precise about what those are: they are Razorpay orders, which is a
+> server-side authorisation to collect a specific amount. Settling one needs a payment
+> instrument, and that is a layer I have not built. A mandate says how much and where.
+> An instrument says how the money travels. In production you register a UPI Autopay
+> debit once, at the same moment you sign the mandate, and the agent spends against both
+> without anyone tapping anything again. There is no payment link anywhere in this run,
+> because a person tapping a checkout is the thing this replaces.
 
 ---
 
@@ -203,11 +211,13 @@ curl -s localhost:3000/api/catalog | head -40
 
 ## 4:40 – 4:55 · What is not real
 
-> What is not real yet, and it is all in the README. The catalog is seeded, four merchants.
-> There is no authentication. Mandates are signed with a shared secret rather than a
-> keypair the merchant could verify independently. The gateway runs in the same process as
-> the agent, so that boundary is drawn at an HTTP route rather than by a network. And
-> everything is Razorpay test mode. The code refuses to run against a live key.
+> What is not real yet, and it is all in the README. Orders are authorisations, not
+> settled payments — there is no payment instrument, so that layer is stated rather than
+> built. The catalog is seeded, four merchants. There is no authentication. Mandates are
+> signed with a shared secret rather than a keypair the merchant could verify
+> independently. The gateway runs in the same process as the agent, so that boundary is
+> drawn at an HTTP route rather than by a network. And everything is Razorpay test mode.
+> The code refuses to run against a live key.
 
 ---
 

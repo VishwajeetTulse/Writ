@@ -6,12 +6,16 @@ import type { MandateTerms } from "./mandate";
 
 /**
  * The explainer's one job is not to be eloquent. It is to never say anything the
- * arithmetic does not support.
+ * arithmetic does not support, and to say it to the right reader.
  *
  * The most valuable test here is the round-trip: take a real decision from the policy
  * engine, render it, and assert the sentence carries the same numbers the engine used.
  * A sentence built from a different source could drift; one built from the recorded
  * evidence cannot.
+ *
+ * The second most valuable one checks the register. `text` is read by whoever's money
+ * this is, so implementation words in it are a defect — there is a test below that
+ * fails on them by name.
  */
 
 const NOW = new Date("2026-09-03T10:00:00.000Z");
@@ -91,6 +95,66 @@ describe("explainDecision", () => {
     expect(explanation.text).toContain("₹598.00");
   });
 
+  it("keeps implementation words out of the plain sentence", () => {
+    // The person reading this is the one whose money it is. They do not know what an
+    // idempotency key is and should not have to.
+    const JARGON = [
+      "idempotency",
+      "unique index",
+      "HMAC",
+      "gateway",
+      "cached",
+      "canonical",
+      "enum",
+      "boolean",
+      "null",
+      "API",
+      "SKU",
+      "paise",
+    ];
+
+    const cases = [
+      explainReal(ctx(), spend(), action({ amountPaise: 900_00n })),
+      explainReal(ctx(), spend({ idempotencyKeyUsed: true }), action()),
+      explainReal({ ...ctx(), status: "REVOKED" }, spend(), action()),
+      explainReal({ ...ctx(), signatureValid: false }, spend(), action()),
+      explainReal(ctx(), spend(), action({ merchantId: "mrc_other" })),
+      explainReal(ctx(), spend(), action()),
+    ];
+
+    for (const { decision, explanation } of cases) {
+      for (const word of JARGON) {
+        expect(
+          explanation.text.toLowerCase(),
+          `${decision.reasonCode ?? "ALLOW"} plain text contains "${word}"`,
+        ).not.toContain(word.toLowerCase());
+      }
+    }
+  });
+
+  it("puts the implementation detail in the mechanism instead of dropping it", () => {
+    const { explanation } = explainReal(
+      ctx(),
+      spend({ idempotencyKeyUsed: true }),
+      action(),
+    );
+
+    expect(explanation.text).toContain("charged twice");
+    expect(explanation.mechanism).toBeTruthy();
+    expect(explanation.mechanism!.toLowerCase()).toContain("unique database constraint");
+  });
+
+  it("names the shops a mandate covers, not their internal ids", () => {
+    const { explanation } = explainReal(
+      ctx(),
+      spend(),
+      action({ merchantId: "mrc_homestack" }),
+    );
+
+    expect(explanation.text).toContain("FreshCart");
+    expect(explanation.text).not.toContain("mrc_freshcart");
+  });
+
   it("names every other bound the same action broke", () => {
     const { decision, explanation } = explainReal(
       ctx(),
@@ -108,14 +172,17 @@ describe("explainDecision", () => {
       "PER_TXN_CAP_EXCEEDED",
       "TOTAL_CAP_EXCEEDED",
     ]);
-    expect(explanation.text).toContain("3 other bounds");
+    // Read out in plain language, not as a list of constants.
+    expect(explanation.text).toContain("over the single-purchase limit");
+    expect(explanation.text).toContain("over the total budget");
+    expect(explanation.alsoViolatedPlain).toHaveLength(3);
   });
 
   it("explains a permitted purchase and what it left behind", () => {
     const { explanation } = explainReal(ctx(), spend({ spentPaise: 100_00n }), action());
 
     expect(explanation.verdict).toBe("ALLOW");
-    expect(explanation.text).toContain("permitted");
+    expect(explanation.text).toContain("Allowed");
     // 2000 - 100 - 68
     expect(explanation.text).toContain("₹1,832.00");
   });

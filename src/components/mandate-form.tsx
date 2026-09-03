@@ -15,7 +15,11 @@ import { Card } from "@/components/ui";
  * *actual* policy engine — the same `evaluate` the gateway calls on every purchase —
  * against the live catalog, in the browser, on every keystroke. Nothing is mocked and
  * nothing is approximated: `evaluate` is a pure function with no database, no network
- * and no model in it, so it runs identically on either side of the wire.
+ * and no model in it, so the verdicts here are the verdicts the gateway will reach.
+ *
+ * The one thing that differs between here and the server is how the engine times
+ * itself, because browsers have no high-resolution process clock. The verdict does not
+ * depend on that, and the preview does not show a latency.
  *
  * That turns signing from an act of faith into an act of reading. Before you grant
  * authority you can see precisely which of a merchant's products this mandate permits

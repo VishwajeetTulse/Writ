@@ -40,7 +40,15 @@ export interface PurchaseRequest {
   quantity: number;
   idempotencyKey: string;
   runId?: string | null;
-  /** Create a Payment Link as well as an Order. Used for the demo's flagship purchase. */
+  /**
+   * Also create a Payment Link: a hosted page a human opens and pays.
+   *
+   * Deliberately **not** used on the agent path. A link that needs a human tap is the
+   * slow checkout this product exists to replace, so putting one in an agent run would
+   * contradict the pitch. It stays here because a human-present checkout is a real use
+   * for the same gated purchase, and it is reachable only by passing this flag
+   * explicitly.
+   */
   withPaymentLink?: boolean;
 }
 

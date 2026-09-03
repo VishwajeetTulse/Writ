@@ -4,24 +4,31 @@ import { REASON_LABELS, type ReasonCode, type Verdict } from "./policy";
 /**
  * Explaining a decision.
  *
- * Track 1's bar asks that every money action be **explainable**. This is that, and the
- * interesting choice here is that it does not use a language model.
+ * Track 1's bar asks that every money action be **explainable**, and getting this right
+ * meant first answering a question the code cannot: explainable *to whom*.
  *
- * The reason is not cost or latency. It is that the explanation and the enforcement
- * have to be the same fact. Every verdict this system reaches already carries its
- * arithmetic — the amount, the cap, the overage, the allowlist it missed — because the
- * policy engine records evidence rather than prose. Turning that into a sentence is
- * rendering, not reasoning. A model asked to do it can only introduce the possibility
- * of saying something the numbers do not support.
+ * The audit trail has three readers and they want different things.
  *
- * So the sentence is generated from the evidence, and the UI shows the reason code
- * beside it. Anyone can check the two against each other, which is exactly the property
- * the bar is asking for.
+ *   1. **The person who signed the mandate.** They want to know why their agent did not
+ *      buy the thing they asked for. They do not care that a check is an integer
+ *      comparison or that an index is unique. It is their money, and the answer they
+ *      need is in rupees and shop names.
+ *   2. **The merchant, in a dispute.** They want to show a purchase was authorised, and
+ *      by what.
+ *   3. **An engineer or an auditor.** They want the reason code, the arithmetic and the
+ *      mechanism, because they are checking whether to believe any of it.
  *
- * When `ANTHROPIC_API_KEY` is configured, a model may rephrase this into something more
- * fluent. It is explicitly toothless: it receives the rendered facts, it cannot change
- * a verdict, and `source` on the result says which version you are reading. The numbers
- * below are the ones that count either way.
+ * Writing one paragraph for all three produces something that serves none of them. So
+ * every explanation here comes in two registers. `text` is for the first two readers:
+ * plain, second person, no implementation words at all. `mechanism` is for the third,
+ * and it is where the idempotency keys and the signature checks live. The interface
+ * leads with `text` and keeps `mechanism` one line below it.
+ *
+ * Neither is written by a model. Every decision already carries its own arithmetic,
+ * because the engine records evidence rather than prose, so this is rendering rather
+ * than reasoning. A model asked to do it could only introduce the possibility of saying
+ * something the numbers do not support. When `ANTHROPIC_API_KEY` is set a model may
+ * rephrase `text`; it never touches the facts, and `source` says which you are reading.
  */
 
 export interface ExplanationFact {
@@ -32,14 +39,17 @@ export interface ExplanationFact {
 export interface Explanation {
   verdict: Verdict;
   reasonCode: ReasonCode | string | null;
-  /** The human-facing label for the code, straight from the engine's closed enum. */
+  /** The engine's own label for the code, from its closed enum. */
   reasonLabel: string | null;
-  /** One or two sentences, built from the arithmetic below. */
+  /** Plain language, for whoever's money this is. No jargon, no implementation. */
   text: string;
-  /** The machine facts the sentence was rendered from, so it can be checked against it. */
+  /** How it was enforced. For an engineer or an auditor, not for the mandate holder. */
+  mechanism: string | null;
+  /** The numbers behind the sentence, so the two can be checked against each other. */
   facts: ExplanationFact[];
-  /** Other bounds the same action broke, when it broke more than one. */
   alsoViolated: string[];
+  /** Plain-language names for the other bounds, when there were any. */
+  alsoViolatedPlain: string[];
   source: "deterministic" | "model";
 }
 
@@ -66,78 +76,118 @@ function list(value: unknown): string[] {
   return Array.isArray(value) ? value.map((v) => String(v)) : [];
 }
 
+/** "FreshCart and DailyBasket" rather than "FreshCart, DailyBasket". */
+function join(items: string[]): string {
+  if (items.length === 0) return "";
+  if (items.length === 1) return items[0];
+  return `${items.slice(0, -1).join(", ")} and ${items.at(-1)}`;
+}
+
 function duration(ms: unknown): string {
   const n = count(ms);
-  if (n === null) return "some time";
-  if (n < 60_000) return `${Math.round(n / 1000)} seconds`;
-  if (n < 3_600_000) return `${Math.round(n / 60_000)} minutes`;
-  if (n < 86_400_000) return `${Math.round(n / 3_600_000)} hours`;
-  return `${Math.round(n / 86_400_000)} days`;
+  if (n === null) return "a while";
+  if (n < 60_000) return `${Math.max(Math.round(n / 1000), 1)} seconds`;
+  if (n < 3_600_000) {
+    const m = Math.round(n / 60_000);
+    return `${m} minute${m === 1 ? "" : "s"}`;
+  }
+  if (n < 86_400_000) {
+    const h = Math.round(n / 3_600_000);
+    return `${h} hour${h === 1 ? "" : "s"}`;
+  }
+  const d = Math.round(n / 86_400_000);
+  return `${d} day${d === 1 ? "" : "s"}`;
 }
+
+/**
+ * What each bound is called when you are not an engineer.
+ *
+ * Used for the "it also broke" tail, so a multi-violation refusal reads as a list of
+ * reasons rather than a list of constants.
+ */
+const PLAIN_BOUND: Record<string, string> = {
+  MERCHANT_NOT_ALLOWED: "the shop was not approved",
+  CATEGORY_NOT_ALLOWED: "the kind of item was not approved",
+  PER_TXN_CAP_EXCEEDED: "it was over the single-purchase limit",
+  TOTAL_CAP_EXCEEDED: "it was over the total budget",
+  MANDATE_EXPIRED: "the permission had run out",
+  MANDATE_REVOKED: "the permission had been withdrawn",
+  MANDATE_EXHAUSTED: "the budget was already spent",
+  SIGNATURE_INVALID: "the permission could not be trusted",
+  DUPLICATE_REQUEST: "it was a repeat of a purchase already made",
+  VELOCITY_EXCEEDED: "it was too many purchases too quickly",
+  UNKNOWN_SKU: "the product does not exist",
+  QUANTITY_INVALID: "the quantity was not a real number of items",
+};
 
 export interface ExplainInput {
   verdict: Verdict;
   reasonCode: ReasonCode | string | null;
   evidence: Record<string, unknown>;
-  /** Every bound broken, when the caller has them. */
   violations?: Array<{ reasonCode: string }>;
   productName?: string | null;
   merchantName?: string | null;
   latencyUs?: number | null;
 }
 
-/**
- * Render one decision into a sentence and the facts behind it.
- *
- * Every branch pulls its numbers from the evidence the engine recorded. Nothing here
- * recomputes a verdict or reaches for the database, so an explanation cannot disagree
- * with the decision it is explaining.
- */
 export function explainDecision(input: ExplainInput): Explanation {
   const { evidence: e } = input;
-  const subject = input.productName ? `“${input.productName}”` : "This purchase";
+  const item = input.productName ? `“${input.productName}”` : "this purchase";
+  const Item = input.productName ? `“${input.productName}”` : "This purchase";
 
   const facts: ExplanationFact[] = [];
   const fact = (label: string, value: string) => facts.push({ label, value });
 
   let text: string;
+  let mechanism: string | null = null;
 
   switch (input.reasonCode) {
     case null: {
       const amount = money(e.amountPaise);
       const left = paise(e.remainingAfterPaise);
       fact("Amount", amount);
-      if (left !== null) fact("Left on the mandate", formatPaise(left));
+      if (left !== null) fact("Budget left", formatPaise(left));
       text =
-        `${subject} was permitted. It is at a merchant on the mandate's allowlist, in a ` +
-        `permitted category, and ${amount} fits inside both the per-transaction and the ` +
-        `total cap` +
-        (left !== null ? `, leaving ${formatPaise(left)}.` : ".");
+        `Allowed. ${amount} for ${item}, from a shop you approved and inside both your ` +
+        `limits.` + (left !== null ? ` ${formatPaise(left)} left to spend.` : "");
+      mechanism =
+        "Priced from the catalog rather than from the agent's request, then checked " +
+        "against the signed terms before any payment call was made.";
       break;
     }
 
     case "MERCHANT_NOT_ALLOWED": {
-      const attempted = String(e.attemptedMerchant ?? input.merchantName ?? "that merchant");
-      const allowed = list(e.allowedMerchants);
-      fact("Merchant asked for", attempted || "(empty)");
-      fact("Merchant allowlist", allowed.length ? allowed.join(", ") : "(empty)");
+      const shop = input.merchantName ?? String(e.attemptedMerchant ?? "an unknown shop");
+      const names = list(e.allowedMerchantNames);
+      const ids = list(e.allowedMerchants);
+      const approved = names.length ? names : ids;
+
+      fact("Shop", shop || "(none given)");
+      fact("Shops you approved", approved.length ? approved.join(", ") : "(none)");
+
       text =
-        `${subject} was refused because it is sold by ${attempted || "an unnamed merchant"}, ` +
-        `which is not on this mandate's allowlist. The mandate permits ` +
-        (allowed.length
-          ? `${allowed.length} merchant${allowed.length === 1 ? "" : "s"}: ${allowed.join(", ")}.`
-          : "no merchants at all.");
+        `Stopped. ${Item} is sold by ${shop || "a shop with no name"}, which is not one ` +
+        `of the shops you approved. ` +
+        (approved.length
+          ? `This permission covers ${join(approved)}.`
+          : `This permission covers no shops at all.`);
+      mechanism =
+        "The list of shops is inside the signed terms and is matched on exact merchant " +
+        "id, so a lookalike name cannot pass for an approved one.";
       break;
     }
 
     case "CATEGORY_NOT_ALLOWED": {
-      const attempted = String(e.attemptedCategory ?? "that category");
-      const allowed = list(e.allowedCategories);
-      fact("Category asked for", attempted || "(empty)");
-      fact("Categories permitted", allowed.length ? allowed.join(", ") : "(none)");
+      const kind = String(e.attemptedCategory ?? "that kind of thing");
+      const approved = list(e.allowedCategories);
+      fact("Kind of item", kind || "(none given)");
+      fact("Kinds you approved", approved.length ? approved.join(", ") : "(none)");
       text =
-        `${subject} was refused because it is a ${attempted || "blank"} item, and this ` +
-        `mandate only covers ${allowed.length ? allowed.join(" and ") : "nothing"}.`;
+        `Stopped. ${Item} is ${kind || "an unlabelled"} item, and you only approved ` +
+        `${approved.length ? join(approved) : "nothing"}.`;
+      mechanism =
+        "The category comes from the catalog record, not from anything the agent said " +
+        "about the product.";
       break;
     }
 
@@ -145,12 +195,15 @@ export function explainDecision(input: ExplainInput): Explanation {
       const amount = money(e.amountPaise);
       const cap = money(e.perTxnCapPaise);
       const over = money(e.overByPaise);
-      fact("Amount", amount);
-      fact("Per-transaction cap", cap);
+      fact("Price", amount);
+      fact("Your limit per purchase", cap);
       fact("Over by", over);
       text =
-        `${subject} was refused because it costs ${amount}, and this mandate allows at ` +
-        `most ${cap} in a single transaction. It is ${over} over the line.`;
+        `Stopped. ${Item} costs ${amount}, and you set a limit of ${cap} on any single ` +
+        `purchase. It is ${over} too much.`;
+      mechanism =
+        "Compared as whole paise against the signed cap, so no rounding is involved and " +
+        "the result is the same every time.";
       break;
     }
 
@@ -159,16 +212,19 @@ export function explainDecision(input: ExplainInput): Explanation {
       const spent = money(e.spentPaise);
       const cap = money(e.totalCapPaise);
       const remaining = paise(e.remainingPaise);
-      fact("Amount", amount);
+      fact("Price", amount);
       fact("Already spent", spent);
-      fact("Total cap", cap);
+      fact("Your total budget", cap);
       if (remaining !== null) fact("Left before this", formatPaise(remaining));
       text =
-        `${subject} was refused because ${spent} of this mandate's ${cap} is already ` +
-        `committed. Adding ${amount} would take it past the total cap` +
+        `Stopped. ${spent} of your ${cap} budget is already committed, and ${amount} ` +
+        `for ${item} would take you over it.` +
         (remaining !== null && remaining > 0n
-          ? `, and only ${formatPaise(remaining)} remains.`
-          : ", which is fully spent.");
+          ? ` Only ${formatPaise(remaining)} was left.`
+          : "");
+      mechanism =
+        "Spend counts orders that have been placed as well as ones that have settled, " +
+        "so an agent cannot outrun its own budget while payments are still in flight.";
       break;
     }
 
@@ -176,35 +232,43 @@ export function explainDecision(input: ExplainInput): Explanation {
       const inWindow = count(e.purchasesInWindow);
       const max = count(e.velocityMax);
       const windowS = count(e.velocityWindowS);
-      fact("Purchases in the window", String(inWindow ?? "?"));
-      fact("Rate limit", max !== null && windowS !== null ? `${max} per ${windowS}s` : "?");
+      const window = windowS === 3600 ? "an hour" : `${windowS ?? "?"} seconds`;
+      fact("Purchases just now", String(inWindow ?? "?"));
+      fact("Your rate limit", max !== null ? `${max} per ${window}` : "?");
       text =
-        `${subject} was refused because this mandate allows ${max ?? "a limited number of"} ` +
-        `purchases every ${windowS ?? "?"} seconds, and ${inWindow ?? "too many"} have ` +
-        `already gone through inside that window. It is a rate limit, not a spending ` +
-        `limit — the money is still available, but not this quickly.`;
+        `Stopped. You allowed ${max ?? "a set number of"} purchases per ${window}, and ` +
+        `your agent has already made ${inWindow ?? "more than that"}. Your budget is ` +
+        `untouched — this one was simply too soon.`;
+      mechanism =
+        "A sliding window over the timestamps of prior allowed purchases. Older ones " +
+        "fall out of it and stop counting.";
       break;
     }
 
     case "MANDATE_EXPIRED": {
       const expiresAt = typeof e.expiresAt === "string" ? e.expiresAt : null;
-      fact("Expired at", expiresAt ?? "(unrecorded)");
-      fact("Lapsed", `${duration(e.expiredForMs)} ago`);
+      fact("Ran out", `${duration(e.expiredForMs)} ago`);
+      if (expiresAt) fact("Expiry", expiresAt);
       text =
-        `${subject} was refused because this mandate expired ${duration(e.expiredForMs)} ` +
-        `ago. Expiry is judged against the clock every time the mandate is used, not ` +
-        `recorded once and trusted, so a mandate that lapses while nobody is watching ` +
-        `stops working on its own.`;
+        `Stopped. This permission ran out ${duration(e.expiredForMs)} ago, so your agent ` +
+        `can no longer spend against it.`;
+      mechanism =
+        "Expiry is compared against the clock every time the permission is used, rather " +
+        "than recorded once and trusted, so one that lapses unattended stops working " +
+        "on its own.";
       break;
     }
 
     case "MANDATE_REVOKED": {
-      fact("Mandate", String(e.mandateId ?? "(unrecorded)"));
-      fact("Status", "REVOKED");
+      fact("Permission", String(e.mandateId ?? "(unrecorded)"));
+      fact("State", "withdrawn");
       text =
-        `${subject} was refused because this mandate was revoked. Nothing was sent to ` +
-        `the agent and no run was interrupted — the gateway re-reads the mandate on ` +
-        `every attempt and never caches it, so revoking takes effect on the very next call.`;
+        `Stopped. You withdrew this permission, so your agent cannot spend any more ` +
+        `against it.`;
+      mechanism =
+        "Authority is read at the moment it is used and never cached, so withdrawing it " +
+        "takes effect on the next attempt. Nothing had to be sent to the agent and no " +
+        "request was cancelled.";
       break;
     }
 
@@ -212,71 +276,85 @@ export function explainDecision(input: ExplainInput): Explanation {
       const spent = money(e.spentPaise);
       const cap = money(e.totalCapPaise);
       fact("Spent", spent);
-      fact("Total cap", cap);
+      fact("Your total budget", cap);
       text =
-        `${subject} was refused because this mandate's entire ${cap} has been spent. ` +
-        `An exhausted mandate confers no further authority, whatever else the request ` +
-        `looked like.`;
+        `Stopped. The whole ${cap} on this permission has been spent, so there is ` +
+        `nothing left for ${item}.`;
+      mechanism =
+        "An exhausted permission is refused before any other check runs, whatever else " +
+        "the request looked like.";
       break;
     }
 
     case "SIGNATURE_INVALID": {
       const status = typeof e.status === "string" ? e.status : null;
-      fact("Mandate", String(e.mandateId ?? "(unrecorded)"));
-      if (status) fact("Status", status);
-      text =
-        status && status !== "ACTIVE"
-          ? `${subject} was refused because this mandate is in ${status} state and was ` +
-            `never signed, so it grants nothing.`
-          : `${subject} was refused because the mandate's stored terms no longer match ` +
-            `its signature. Someone changed a cap, an allowlist or an expiry after it was ` +
-            `signed. The gateway refuses such a mandate outright rather than enforcing ` +
-            `terms nobody agreed to.`;
+      fact("Permission", String(e.mandateId ?? "(unrecorded)"));
+      if (status) fact("State", status.toLowerCase());
+      if (status && status !== "ACTIVE") {
+        text =
+          `Stopped. This permission was never actually granted — it is still a draft — ` +
+          `so it allows nothing.`;
+        mechanism = "Only a signed mandate confers authority. A draft has no signature.";
+      } else {
+        text =
+          `Stopped. This permission does not match what you signed. A limit, a shop or ` +
+          `an expiry has been changed since then, so it cannot be trusted and nothing ` +
+          `will be spent against it.`;
+        mechanism =
+          "The signature covers every term. Editing any of them in storage makes it " +
+          "stop matching, and a mandate that fails that check is refused outright " +
+          "rather than enforced as found.";
+      }
       break;
     }
 
     case "DUPLICATE_REQUEST": {
-      fact("Idempotency key", String(e.idempotencyKey ?? "(unrecorded)"));
+      fact("Reference", String(e.idempotencyKey ?? "(unrecorded)"));
       text =
-        `${subject} was refused because this idempotency key has already produced a ` +
-        `purchase. The key is a unique index in the database, so a replayed request ` +
-        `cannot become a second charge even if it arrives at the same instant as the ` +
-        `original. Razorpay was never called.`;
+        `Stopped. Your agent already made this purchase and asked again. The repeat was ` +
+        `ignored, so you have not been charged twice.`;
+      mechanism =
+        "Each purchase carries a one-time reference, held under a unique database " +
+        "constraint. A repeat cannot create a second order even if it arrives at the " +
+        "same instant as the original, and the payment provider was never called.";
       break;
     }
 
     case "UNKNOWN_SKU": {
-      fact("SKU asked for", String(e.sku ?? "(unrecorded)"));
+      fact("Product asked for", String(e.sku ?? "(unrecorded)"));
       text =
-        `This purchase was refused because no such product exists in the catalog. The ` +
-        `gateway prices every purchase itself, so a SKU it cannot find is a purchase it ` +
-        `cannot price, and it will not guess.`;
+        `Stopped. There is no such product in the catalog, so there was nothing to buy.`;
+      mechanism =
+        "Prices are always looked up rather than taken from the request, so a product " +
+        "that cannot be found is one that cannot be priced.";
       break;
     }
 
     case "QUANTITY_INVALID": {
-      const qty = e.quantity;
-      fact("Quantity", String(qty));
+      fact("Quantity", String(e.quantity));
       if (e.amountPaise !== undefined) fact("Amount", money(e.amountPaise));
       text =
-        `${subject} was refused because the quantity was ${String(qty)}, which is not a ` +
-        `positive whole number. A malformed quantity makes the amount meaningless, so ` +
-        `there is nothing coherent left to check against the caps.`;
+        `Stopped. The quantity asked for was ${String(e.quantity)}, which is not a real ` +
+        `number of items, so there was no sensible total to check against your limits.`;
+      mechanism =
+        "Quantity must be a positive whole number. Anything else makes the amount " +
+        "meaningless before the caps are even reached.";
       break;
     }
 
     case "MANDATE_NOT_FOUND": {
-      fact("Mandate", String(e.mandateId ?? "(unrecorded)"));
-      text = `This purchase was refused because no mandate with that id exists.`;
+      fact("Permission", String(e.mandateId ?? "(unrecorded)"));
+      text = `Stopped. There is no permission with that reference, so nothing was allowed.`;
       break;
     }
 
     default: {
-      // A code the renderer does not know. Say so plainly rather than inventing prose.
+      // A code with no renderer. Say so plainly rather than inventing prose.
       text =
         `This action was recorded as ${input.verdict}` +
         (input.reasonCode ? ` with reason ${input.reasonCode}.` : ".") +
-        ` No prose renderer is defined for that code, so the evidence is shown as-is.`;
+        ` There is no plain-language version of that reason yet, so the recorded ` +
+        `details are shown as they are.`;
       for (const [k, v] of Object.entries(e).slice(0, 6)) {
         fact(k, typeof v === "object" ? JSON.stringify(v) : String(v));
       }
@@ -288,15 +366,15 @@ export function explainDecision(input: ExplainInput): Explanation {
     .map((v) => v.reasonCode)
     .filter((code) => code !== input.reasonCode);
 
-  const alsoFromEvidence = list(e.alsoViolated).filter(
-    (code) => !alsoViolated.includes(code),
-  );
-  alsoViolated.push(...alsoFromEvidence);
+  for (const code of list(e.alsoViolated)) {
+    if (!alsoViolated.includes(code)) alsoViolated.push(code);
+  }
 
-  if (alsoViolated.length > 0) {
+  const alsoViolatedPlain = alsoViolated.map((code) => PLAIN_BOUND[code] ?? code);
+
+  if (alsoViolatedPlain.length > 0) {
     text +=
-      ` It also broke ${alsoViolated.length} other bound` +
-      `${alsoViolated.length === 1 ? "" : "s"}: ${alsoViolated.join(", ")}.`;
+      ` It would have been stopped anyway: ${join(alsoViolatedPlain)}.`;
   }
 
   if (input.latencyUs !== null && input.latencyUs !== undefined) {
@@ -308,8 +386,10 @@ export function explainDecision(input: ExplainInput): Explanation {
     reasonCode: input.reasonCode,
     reasonLabel: REASON_LABELS[input.reasonCode as ReasonCode] ?? null,
     text,
+    mechanism,
     facts,
     alsoViolated,
+    alsoViolatedPlain,
     source: "deterministic",
   };
 }

@@ -182,15 +182,19 @@ export async function runScripted(ctx: Ctx) {
   });
   await beat(400);
 
+  // No Payment Link. A link is a hosted page a human taps, and putting one in the
+  // agent path would contradict the entire product: if a person has to approve each
+  // purchase at a checkout, that is the slow checkout this exists to replace.
+  //
+  // What the run produces is a Razorpay Order — a real, server-side authorisation to
+  // collect a specific amount. Settling it needs a payment instrument, and provisioning
+  // one is a separate layer that this prototype does not implement. See the README.
   for (const product of basket) {
     await attempt(
       product.sku,
       product.name,
       product.merchantName,
       Number(product.pricePaise),
-      // The first purchase gets a Payment Link so there is a real, payable URL in the
-      // demo — that is what makes the webhook path visible end to end.
-      { withPaymentLink: allowed === 0 },
     );
   }
 
