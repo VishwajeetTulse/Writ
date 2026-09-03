@@ -186,18 +186,28 @@ export function evaluate(
       totalCapPaise: terms.totalCapPaise,
     });
   }
-  if (status !== "ACTIVE") {
-    // DRAFT — never signed, so it confers nothing.
-    return gate("SIGNATURE_INVALID", { mandateId: terms.id, status });
-  }
-
+  // Expiry is judged from two directions, and both have to be here.
+  //
+  // The clock catches a mandate that lapsed while nobody was looking. The stored
+  // status catches one that `loadMandate` already derived as expired at read time.
+  // Checking only the clock would be enough for correctness — the verdict would still
+  // be BLOCK — but it would fall through to the gate below and report the refusal as
+  // SIGNATURE_INVALID, sending someone hunting for tampering that never happened. The
+  // engine's reason codes are what the ledger records, so naming the wrong cause is a
+  // defect in its own right.
   const expiresAt = new Date(terms.expiresAt);
-  if (now >= expiresAt) {
+  if (status === "EXPIRED" || now >= expiresAt) {
     return gate("MANDATE_EXPIRED", {
       expiresAt: terms.expiresAt,
       now: now.toISOString(),
-      expiredForMs: now.getTime() - expiresAt.getTime(),
+      expiredForMs: Math.max(now.getTime() - expiresAt.getTime(), 0),
+      status,
     });
+  }
+
+  if (status !== "ACTIVE") {
+    // DRAFT — never signed, so it confers nothing.
+    return gate("SIGNATURE_INVALID", { mandateId: terms.id, status });
   }
 
   // A malformed quantity makes the amount meaningless, so there is nothing coherent

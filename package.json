@@ -16,7 +16,8 @@
     "gate2": "tsx scripts/gate2.ts",
     "webhook:test": "tsx scripts/test-webhook.ts",
     "reconcile": "tsx scripts/reconcile.ts",
-    "revoke:test": "tsx scripts/test-revocation.ts"
+    "revoke:test": "tsx scripts/test-revocation.ts",
+    "evals": "tsx evals/run.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",

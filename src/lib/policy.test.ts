@@ -155,6 +155,17 @@ describe("MANDATE_EXPIRED", () => {
     expect(d.reasonCode).toBe("MANDATE_EXPIRED");
   });
 
+  it("reports a mandate whose stored status is EXPIRED as expired, not forged", () => {
+    // `loadMandate` derives EXPIRED at read time, so this is the shape the gateway
+    // actually sees for a lapsed mandate. It used to fall through to the generic
+    // non-ACTIVE gate and come back SIGNATURE_INVALID.
+    const after = new Date("2026-09-03T01:00:00.000Z");
+    const m = { ...mandate(), status: "EXPIRED" as const };
+    const d = evaluate(m, spend(), action(), after);
+    expect(d.verdict).toBe("BLOCK");
+    expect(d.reasonCode).toBe("MANDATE_EXPIRED");
+  });
+
   it("blocks after expiry and reports how long ago", () => {
     const after = new Date("2026-09-03T01:00:00.000Z");
     const d = evaluate(mandate(), spend(), action(), after);
