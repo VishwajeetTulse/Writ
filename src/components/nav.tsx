@@ -7,7 +7,7 @@ const LINKS = [
   { href: "/", label: "Mandates" },
   { href: "/run", label: "Agent run" },
   { href: "/ledger", label: "Ledger" },
-  { href: "/impact", label: "Impact" },
+  { href: "/impact", label: "Spending" },
 ];
 
 export function Nav() {

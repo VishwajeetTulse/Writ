@@ -22,7 +22,7 @@ export default async function NewMandatePage() {
     <Page
       wide
       title="New mandate"
-      lede="Set the bounds, then read what they mean before you sign. The panel on the right runs the real policy engine over the live catalog on every change, so you can see exactly which products this mandate permits and which it refuses."
+      lede="Set the limits. The panel on the right shows exactly what they would permit and refuse, before you sign anything."
     >
       <MandateForm
         merchants={merchants.map((m) => ({

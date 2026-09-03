@@ -51,10 +51,28 @@ export function truncateHash(hash: string, head = 6, tail = 4): string {
   return `${hash.slice(0, head)}…${hash.slice(-tail)}`;
 }
 
-/** "3 per 60s" for a velocity limit, or null when the mandate sets none. */
+/** Seconds as a person would say them: "hour", "30 minutes", "2 days". */
+export function windowLabel(seconds: number): string {
+  const units: Array<[number, string]> = [
+    [86_400, "day"],
+    [3_600, "hour"],
+    [60, "minute"],
+    [1, "second"],
+  ];
+
+  for (const [size, name] of units) {
+    if (seconds >= size && seconds % size === 0) {
+      const n = seconds / size;
+      return n === 1 ? name : `${n} ${name}s`;
+    }
+  }
+  return `${seconds} seconds`;
+}
+
+/** "3 per hour" for a rate limit, or null when the mandate sets none. */
 export function velocityLabel(max: number | null, windowS: number | null): string | null {
   if (!max || !windowS) return null;
-  return `${max} per ${windowS}s`;
+  return `${max} per ${windowLabel(windowS)}`;
 }
 
 /** Audit payloads are stored as JSON text. Never let a malformed one break a screen. */

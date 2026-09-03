@@ -46,6 +46,13 @@ export interface FormMerchant {
 /** The reference instant the preview measures from. See `previewExpiresAt` below. */
 const PREVIEW_NOW = new Date(0);
 
+/**
+ * A rate limit is stored in seconds because that is what the signed terms carry, but
+ * nobody thinks in seconds. The form takes a count and a unit and multiplies.
+ */
+const WINDOW_UNITS = { minute: 60, hour: 3600, day: 86_400 } as const;
+type UnitKey = keyof typeof WINDOW_UNITS;
+
 const DURATIONS = [
   { label: "6 hours", hours: 6 },
   { label: "24 hours", hours: 24 },
@@ -71,7 +78,10 @@ export function MandateForm({
   const [total, setTotal] = useState(2000);
   const [velocityOn, setVelocityOn] = useState(true);
   const [velocityMax, setVelocityMax] = useState(5);
-  const [velocityWindowS, setVelocityWindowS] = useState(3600);
+  const [windowCount, setWindowCount] = useState(1);
+  const [windowUnit, setWindowUnit] = useState<UnitKey>("hour");
+
+  const velocityWindowS = windowCount * WINDOW_UNITS[windowUnit];
   const [hours, setHours] = useState(24 * 7);
 
   const [submitting, setSubmitting] = useState(false);
@@ -337,23 +347,31 @@ export function MandateForm({
           </label>
 
           {velocityOn && (
-            <div className="mt-3 flex items-center gap-2 font-mono text-[13px]">
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-[13px]">
               <input
                 type="number"
                 min={1}
                 value={velocityMax}
-                onChange={(e) => setVelocityMax(Number(e.target.value))}
-                className="w-16 rounded-md border border-line px-2 py-1.5 text-center tnum outline-none focus:border-ink-mute"
+                onChange={(e) => setVelocityMax(Math.max(Number(e.target.value), 1))}
+                className="w-16 rounded-md border border-line px-2 py-1.5 text-center font-mono tnum outline-none focus:border-ink-mute"
               />
-              <span className="text-ink-mute">purchases per</span>
+              <span className="text-ink-mute">purchases every</span>
               <input
                 type="number"
                 min={1}
-                value={velocityWindowS}
-                onChange={(e) => setVelocityWindowS(Number(e.target.value))}
-                className="w-20 rounded-md border border-line px-2 py-1.5 text-center tnum outline-none focus:border-ink-mute"
+                value={windowCount}
+                onChange={(e) => setWindowCount(Math.max(Number(e.target.value), 1))}
+                className="w-16 rounded-md border border-line px-2 py-1.5 text-center font-mono tnum outline-none focus:border-ink-mute"
               />
-              <span className="text-ink-mute">seconds</span>
+              <select
+                value={windowUnit}
+                onChange={(e) => setWindowUnit(e.target.value as UnitKey)}
+                className="rounded-md border border-line bg-surface px-2 py-1.5 outline-none focus:border-ink-mute"
+              >
+                <option value="minute">{windowCount === 1 ? "minute" : "minutes"}</option>
+                <option value="hour">{windowCount === 1 ? "hour" : "hours"}</option>
+                <option value="day">{windowCount === 1 ? "day" : "days"}</option>
+              </select>
             </div>
           )}
         </div>
@@ -466,11 +484,8 @@ export function MandateForm({
           </table>
         </div>
 
-        <p className="mt-3 text-[12px] leading-relaxed text-ink-mute">
-          This is the same <span className="font-mono">evaluate()</span> the gateway runs
-          on every purchase, executed here against the live catalog. It is a pure
-          function with no database, no network and no model in it, so the verdicts above
-          are the verdicts you will get.
+        <p className="mt-3 text-[12px] text-ink-mute">
+          These are the decisions this mandate will actually make once it is signed.
         </p>
       </Card>
     </div>

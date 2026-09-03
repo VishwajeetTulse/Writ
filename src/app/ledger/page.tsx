@@ -72,7 +72,7 @@ export default async function LedgerPage({ searchParams }: PageProps<"/ledger">)
     <Page
       wide
       title="Audit ledger"
-      lede="Append-only and hash-chained. Every row commits to the hash of the row before it, so the trail verifies only if nothing has been edited, reordered or deleted since it was written. Refusals are recorded exactly like purchases — a trail that only records successes proves nothing about what was stopped."
+      lede="Every decision made about your money, allowed and stopped alike. Nothing here can be edited after the fact."
       actions={<VerifyChain recordCount={total} />}
     >
       <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -150,12 +150,6 @@ export default async function LedgerPage({ searchParams }: PageProps<"/ledger">)
         </Card>
       )}
 
-      <p className="mt-4 max-w-[92ch] text-[13px] leading-relaxed text-ink-mute">
-        Latency is the policy engine&rsquo;s own decision time, measured around a pure
-        function with no database and no model call in it. Press Explain on any decision
-        to read it in plain language, rendered from the evidence recorded at the moment
-        it was made.
-      </p>
     </Page>
   );
 }

@@ -23,7 +23,7 @@ export default async function MandatesPage() {
   return (
     <Page
       title="Mandates"
-      lede="A mandate is a signed grant of spending authority: an allowlist, a per-transaction cap, a total cap, an optional rate limit and an expiry. An agent holding one can spend inside it and cannot spend outside it."
+      lede="What each of your agents is allowed to spend, where, and until when."
       actions={
         <Link
           href="/mandates/new"

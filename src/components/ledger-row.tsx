@@ -13,13 +13,10 @@ import type { Verdict } from "@/lib/policy";
  * thing that satisfies "every money action is explainable", and a UI that quietly
  * bypasses it would leave the claim resting on a code path nobody exercises.
  *
- * The panel is ordered by who is reading it. The plain sentence comes first, because
- * the person most likely to open this row is whoever's money it is, and they need shop
- * names and rupees rather than reason codes. The mechanism and the machine code sit
- * below it for an engineer or an auditor, who are the only readers those serve.
- *
- * Both are shown rather than one or the other. A paraphrase you cannot check against
- * the original is a claim, not an explanation.
+ * The panel shows the sentence and the numbers behind it. Nothing else: the reason
+ * code is already in its own column, and an explanation of how the check works is not
+ * something the person reading this came here for. `/api/explain` still returns the
+ * mechanism for anyone integrating against it.
  */
 
 export interface LedgerRowData {
@@ -161,28 +158,6 @@ export function LedgerRow({ row }: { row: LedgerRowData }) {
                   </div>
                 )}
 
-                <div className="mt-4 border-t border-line pt-3">
-                  {explanation.mechanism && (
-                    <p className="text-[12px] leading-relaxed text-ink-mute">
-                      <span className="eyebrow">How it was enforced</span>{" "}
-                      {explanation.mechanism}
-                    </p>
-                  )}
-
-                  <p className="mt-2 text-[11px] leading-relaxed text-ink-mute">
-                    {explanation.reasonCode && (
-                      <>
-                        Machine code{" "}
-                        <span className="font-mono text-ink">
-                          {explanation.reasonCode}
-                        </span>
-                        {explanation.reasonLabel ? `, ${explanation.reasonLabel}. ` : ". "}
-                      </>
-                    )}
-                    Rendered from the evidence recorded at decision time, with no model
-                    involved, so the wording cannot say anything the numbers do not.
-                  </p>
-                </div>
               </div>
             )}
           </td>

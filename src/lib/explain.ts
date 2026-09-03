@@ -105,7 +105,7 @@ function duration(ms: unknown): string {
  * Used for the "it also broke" tail, so a multi-violation refusal reads as a list of
  * reasons rather than a list of constants.
  */
-const PLAIN_BOUND: Record<string, string> = {
+export const PLAIN_BOUND: Record<string, string> = {
   MERCHANT_NOT_ALLOWED: "the shop was not approved",
   CATEGORY_NOT_ALLOWED: "the kind of item was not approved",
   PER_TXN_CAP_EXCEEDED: "it was over the single-purchase limit",
@@ -119,6 +119,17 @@ const PLAIN_BOUND: Record<string, string> = {
   UNKNOWN_SKU: "the product does not exist",
   QUANTITY_INVALID: "the quantity was not a real number of items",
 };
+
+/**
+ * A refusal in the words of whoever's money it is. Falls back to the machine code,
+ * which is at least honest about being one.
+ */
+export function plainReason(code: string | null): string {
+  if (!code) return "Stopped";
+  const plain = PLAIN_BOUND[code];
+  if (!plain) return code;
+  return plain.charAt(0).toUpperCase() + plain.slice(1);
+}
 
 export interface ExplainInput {
   verdict: Verdict;

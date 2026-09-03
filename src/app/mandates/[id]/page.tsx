@@ -11,7 +11,8 @@ import {
   violationsFrom,
 } from "@/lib/format";
 import { Runway } from "@/components/runway";
-import { ReasonChip, StatusPill } from "@/components/verdict";
+import { StatusPill } from "@/components/verdict";
+import { plainReason } from "@/lib/explain";
 import { RevokeButton } from "@/components/revoke-button";
 import { Card, Field, Page } from "@/components/ui";
 
@@ -130,13 +131,14 @@ export default async function MandateDetailPage({ params }: PageProps<"/mandates
               {signatureValid ? "signature valid" : "signature invalid"}
             </span>
             <span className="font-mono text-[11px] text-ink-mute">
-              HMAC-SHA256 {truncateHash(row.signature, 12, 8)}
+              {truncateHash(row.signature, 12, 8)}
             </span>
-            <span className="ml-auto text-[12px] text-ink-mute">
-              {signatureValid
-                ? "These are the terms that were signed."
-                : "The stored terms no longer match the signature. The gateway refuses this mandate outright."}
-            </span>
+            {!signatureValid && (
+              <span className="ml-auto text-[12px] text-deny">
+                These terms have been changed since they were signed. Nothing can be
+                spent against this mandate.
+              </span>
+            )}
           </div>
         </Card>
 
@@ -211,18 +213,13 @@ export default async function MandateDetailPage({ params }: PageProps<"/mandates
                           </span>
                         )}
                       </div>
-                      <div className="mt-1.5">
-                        <ReasonChip code={e.reasonCode ?? "BLOCKED"} withLabel />
+                      <div className="mt-1 text-[12px] text-ink-mute">
+                        {plainReason(e.reasonCode)}
+                        {violations.length > 1 &&
+                          `, and ${violations.length - 1} other reason${
+                            violations.length === 2 ? "" : "s"
+                          }`}
                       </div>
-                      {violations.length > 1 && (
-                        <div className="mt-1.5 font-mono text-[10px] text-ink-mute">
-                          + also broke{" "}
-                          {violations
-                            .slice(1)
-                            .map((v) => v.reasonCode)
-                            .join(", ")}
-                        </div>
-                      )}
                     </li>
                   );
                 })}
@@ -231,16 +228,12 @@ export default async function MandateDetailPage({ params }: PageProps<"/mandates
           </Card>
         </div>
 
-        <p className="pt-1 text-[13px] text-ink-mute">
-          Every row above is read from the hash-chained ledger, not recomputed here.{" "}
-          <Link
-            href={`/ledger?mandate=${row.id}`}
-            className="text-ink underline underline-offset-2"
-          >
-            See the full trail for this mandate
-          </Link>
-          .
-        </p>
+        <Link
+          href={`/ledger?mandate=${row.id}`}
+          className="inline-block pt-1 text-[13px] text-ink underline underline-offset-2"
+        >
+          See everything this mandate has done
+        </Link>
       </div>
     </Page>
   );
