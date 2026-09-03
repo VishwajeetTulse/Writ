@@ -213,6 +213,14 @@ export async function verifyChain(): Promise<ChainVerification> {
 }
 
 export interface LedgerQuery {
+  /**
+   * Restrict to events about one account's mandates.
+   *
+   * Events with no mandate at all — a rejected webhook, a system note — are excluded
+   * by this filter, which is correct: they are facts about the service rather than
+   * about anybody's money.
+   */
+  userId?: string;
   mandateId?: string;
   runId?: string;
   verdict?: Verdict;
@@ -232,6 +240,7 @@ export interface LedgerQuery {
 export async function queryLedger(q: LedgerQuery = {}) {
   return prisma.auditEvent.findMany({
     where: {
+      ...(q.userId ? { mandate: { userId: q.userId } } : {}),
       ...(q.mandateId ? { mandateId: q.mandateId } : {}),
       ...(q.runId ? { runId: q.runId } : {}),
       ...(q.verdict ? { verdict: q.verdict } : {}),

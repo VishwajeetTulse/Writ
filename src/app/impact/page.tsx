@@ -7,6 +7,7 @@ import { relativeTime } from "@/lib/format";
 import { Runway } from "@/components/runway";
 import { StatusPill } from "@/components/verdict";
 import { Card, Empty, Page, Stat } from "@/components/ui";
+import { requireUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
@@ -19,9 +20,11 @@ export const dynamic = "force-dynamic";
  * mandate that keeps refusing things you wanted is a mandate to widen.
  */
 export default async function SpendingPage() {
+  const user = await requireUser();
+
   const [summary, mandates] = await Promise.all([
-    buildSpendingSummary(),
-    listMandates(),
+    buildSpendingSummary(user.id),
+    listMandates(user.id),
   ]);
 
   const active = mandates.filter((m) => m.status === "ACTIVE");

@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { HARNESS_USER_ID } from "./harness-user";
 import { issueMandate, revokeMandate } from "../src/lib/mandate-service";
 import { attemptPurchase, newIdempotencyKey } from "../src/lib/gateway";
 import { verifyChain } from "../src/lib/ledger";
@@ -44,6 +45,7 @@ async function main() {
   // Rs700 per transaction, Rs2000 total.
   const expiresAt = new Date(Date.now() + 6 * 60 * 60 * 1000).toISOString();
   const { id: mandateId } = await issueMandate({
+    userId: HARNESS_USER_ID,
     intentText:
       "Restock the kitchen for the week. Under Rs2000 total, nothing over Rs700 a shot, " +
       "only FreshCart and DailyBasket, groceries only.",
@@ -195,7 +197,7 @@ async function main() {
 
   console.log("\n  --- revocation mid-run ---\n");
 
-  await revokeMandate(mandateId);
+  await revokeMandate(mandateId, HARNESS_USER_ID);
   const afterRevoke = verdictLine(
     "Sugar (after revoke)",
     await attemptPurchase({

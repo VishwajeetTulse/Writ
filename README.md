@@ -28,11 +28,14 @@ npm run db:seed
 npm run dev
 ```
 
-Open http://localhost:3000 and press **Run** on the Activity screen.
+Open http://localhost:3000, sign in with Google, and press **Run** on the Activity
+screen. A new account is given its own sample mandates, so there is something to run
+against immediately.
 
-`.env.example` explains each value. You need a Razorpay **test** key and a signing
-secret; a webhook secret if you want to exercise settlement. The Anthropic key is
-optional and everything in this README works without it, see
+`.env.example` explains each value. You need a Razorpay **test** key, a mandate signing
+secret, and a Google OAuth client for sign-in; a webhook secret if you want to exercise
+settlement. The Anthropic key is optional and everything in this README works without
+it, see
 [Where the model is](#where-the-model-is-and-is-not).
 
 Writ refuses to use a live Razorpay key. The check sits inside the one function that
@@ -84,6 +87,24 @@ matter — the gateway looks the price up in the catalog and evaluates the real 
 
 A ledger that only records successes proves nothing about what was stopped. Every
 branch of the gateway appends, including the early refusals.
+
+### Three callers, three ways of proving themselves
+
+Collapsing these would either lock the agent out of the gateway or let a browser cookie
+move money, so they are kept apart deliberately.
+
+| Caller | Proves itself with | Reaches |
+|---|---|---|
+| A person, in the console | Google sign-in, database-backed session | The console and its APIs. Sees only their own mandates |
+| An agent, at the gateway | The signed mandate it presents | `/api/gateway/purchase` and the open catalog. Never has a session |
+| Razorpay, at the webhook | HMAC over the raw request body | `/api/webhooks/razorpay` only |
+
+Sessions are rows rather than signed tokens, so signing out ends one immediately instead
+of leaving it valid until it expires. That is the same reason mandate status is re-read
+on every purchase rather than cached.
+
+Discovery stays open to everyone with no account at all, because an AI buyer has to be
+able to read the catalog cold. Open discovery, gated execution.
 
 ### Revocation is not a message
 
@@ -252,8 +273,21 @@ Stated plainly, because a security claim with unstated boundaries is worth nothi
   would close that.
 - **The catalog is seeded**, four merchants and seventeen products, not a live merchant
   integration.
-- **Single tenant, SQLite, one signing key.** No merchant onboarding, no key rotation,
-  no multi-user isolation.
+- **The mandate id is the agent's only credential.** Sign-in protects the console, and
+  every mandate, purchase and ledger row is scoped to the account that owns it. The
+  gateway is deliberately outside that, because agents have no session — but it means
+  anyone who learns a mandate id can spend inside that mandate's bounds. The bounds hold,
+  so the damage is capped at what the human already authorised, and the attempt is
+  recorded. It is still the next thing to fix: the agent should present a token issued
+  alongside the mandate, not just its id.
+- **No merchant product.** Merchants are seeded, and integrating real ones is out of
+  scope rather than unbuilt-by-accident. Two routes exist and both were rejected for
+  this prototype: scraping aggregators would breach their terms and Razorpay's, and a
+  self-serve merchant dashboard is a second product rather than a feature. The honest
+  position is that Writ sells to the buyer side and a merchant integrates through the
+  catalog API.
+- **SQLite, one signing key, one deployment.** No key rotation, no tenancy beyond
+  per-account data scoping.
 - **Test mode only.** Writ refuses to start against a live Razorpay key. Nothing here
   has moved real money.
 - **`webhook:test` signs a body; it does not fake a payment.** The purchase and the

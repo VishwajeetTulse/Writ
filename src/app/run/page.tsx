@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { listMandates } from "@/lib/mandate-service";
+import { requireUser } from "@/lib/session";
 import { RunConsole } from "@/components/run-console";
 import { Empty, Page } from "@/components/ui";
 
@@ -13,7 +14,8 @@ export const dynamic = "force-dynamic";
  * the wall and is stopped.
  */
 export default async function RunPage() {
-  const mandates = await listMandates();
+  const user = await requireUser();
+  const mandates = await listMandates(user.id);
 
   return (
     <Page

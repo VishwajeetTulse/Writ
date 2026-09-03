@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { explainDecision } from "@/lib/explain";
 import { parsePayload, violationsFrom } from "@/lib/format";
 import type { Verdict } from "@/lib/policy";
+import { requireApiUser } from "@/lib/session";
 
 /**
  * Explain one recorded decision.
@@ -21,6 +22,9 @@ import type { Verdict } from "@/lib/policy";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
+  const { user, response } = await requireApiUser();
+  if (response) return response;
+
   const seqParam = new URL(request.url).searchParams.get("seq");
   const seq = Number(seqParam);
 
@@ -31,7 +35,11 @@ export async function GET(request: Request) {
     );
   }
 
-  const event = await prisma.auditEvent.findUnique({ where: { seq } });
+  // Scoped by the same rule as the ledger itself: an event about someone else's
+  // mandate reads as an event that does not exist.
+  const event = await prisma.auditEvent.findFirst({
+    where: { seq, mandate: { userId: user.id } },
+  });
   if (!event) {
     return Response.json({ error: "No such ledger event." }, { status: 404 });
   }

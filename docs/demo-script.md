@@ -18,8 +18,9 @@ npm run evals           # so the numbers you quote are today's
 Then:
 
 - Razorpay dashboard open in a second tab, on **Transactions → Orders**, already logged in.
-- Browser at http://localhost:3000, on **Mandates**. Two mandates are visible:
-  `mnd_demo_weekly` active and `mnd_demo_lapsed` expired. The screen is not empty.
+- Browser at http://localhost:3000, **already signed in**, on **Mandates**. Two sample
+  mandates are visible, one active and one expired. The screen is not empty.
+  Do not record the sign-in itself; mention it in one line instead.
 - A terminal ready with the `curl` from beat 2 typed but not entered.
 - Zoom to about 125%. The mono type is small and a judge is watching on a laptop.
 
@@ -65,6 +66,9 @@ curl -s localhost:3000/api/catalog | head -40
 
 *Screen: click `mnd_demo_weekly`.*
 
+> I signed in with Google, and this account has its own mandates — nobody else can see
+> them, and nobody else can revoke them.
+>
 > This is the authority. Two merchants on the allowlist, groceries and household only,
 > seven hundred rupees a transaction, two thousand for the week, five purchases an hour,
 > expires in seven days.

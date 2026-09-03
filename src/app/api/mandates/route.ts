@@ -2,6 +2,7 @@ import { z } from "zod";
 import { listMandates, issueMandate } from "@/lib/mandate-service";
 import { clampDraft, MANDATE_CEILINGS } from "@/lib/mandate";
 import { listMerchants } from "@/lib/catalog";
+import { requireApiUser } from "@/lib/session";
 
 /**
  * Mandates, over HTTP.
@@ -35,7 +36,13 @@ const IssueSchema = z.object({
 });
 
 export async function GET() {
-  const [mandates, merchants] = await Promise.all([listMandates(), listMerchants()]);
+  const { user, response } = await requireApiUser();
+  if (response) return response;
+
+  const [mandates, merchants] = await Promise.all([
+    listMandates(user.id),
+    listMerchants(),
+  ]);
 
   return Response.json({
     mandates: mandates.map((m) => ({
@@ -49,6 +56,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const { user, response } = await requireApiUser();
+  if (response) return response;
+
   let body: unknown;
   try {
     body = await request.json();
@@ -79,7 +89,11 @@ export async function POST(request: Request) {
     rationale: {},
   });
 
-  const issued = await issueMandate({ intentText: input.intentText, draft });
+  const issued = await issueMandate({
+    userId: user.id,
+    intentText: input.intentText,
+    draft,
+  });
 
   return Response.json(
     {

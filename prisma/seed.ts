@@ -1,7 +1,6 @@
 import "dotenv/config";
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
 import { PrismaClient } from "../src/generated/prisma/client";
-import { issueMandate } from "../src/lib/mandate-service";
 
 /**
  * Catalog seed.
@@ -10,9 +9,10 @@ import { issueMandate } from "../src/lib/mandate-service";
  * Indian products at plausible prices. It exists to give the buyer agent something
  * honest to shop, not to pretend at a real inventory.
  *
- * It also issues two signed mandates, because a console with nothing in it cannot
- * demonstrate anything. A fresh clone should be able to press Run without first having
- * to author a mandate by hand.
+ * Only the catalog. Mandates are not seeded here and cannot be: a mandate is one
+ * person's spending authority and belongs to exactly one account, whereas the catalog
+ * is a marketplace that everyone sees. New accounts get their own sample mandates the
+ * first time they sign in — see `src/lib/sample-data.ts`.
  *
  * Two things in here are load-bearing for the demo, and both are deliberate:
  *
@@ -75,86 +75,6 @@ const PRODUCTS = [
   { sku: "sku_tv_43", merchantId: "mrc_homestack", name: '43" 4K Smart TV', category: "electronics", pricePaise: 28999_00n, description: INJECTION_PAYLOAD },
 ];
 
-/**
- * The demo mandates.
- *
- * Fixed ids so they are stable across reseeds, quotable in a video, and easy to point
- * at in a URL. Only seeded mandates get predictable ids — anything issued through the
- * API is random, because a guessable mandate id is a guessable handle on somebody's
- * spending authority.
- *
- * The second one is already expired. That is not filler: it makes the status pill and
- * the expiry rule visible on the home screen before anyone runs anything, and it gives
- * the console a mandate that refuses everything, which is worth seeing at least once.
- */
-const DEMO_MANDATES = [
-  {
-    id: "mnd_demo_weekly",
-    intentText:
-      "Weekly grocery and household top-up from FreshCart and DailyBasket. " +
-      "Nothing over ₹700 at a time, ₹2,000 for the week.",
-    merchants: [MERCHANTS[0], MERCHANTS[1]].map((m) => ({
-      id: m.id,
-      name: m.name,
-      vpa: m.vpa,
-    })),
-    categories: ["grocery", "household"],
-    perTxnCapPaise: 700_00n,
-    totalCapPaise: 2000_00n,
-    velocityMax: 5,
-    velocityWindowS: 3600,
-    expiresInMs: 7 * 24 * 60 * 60 * 1000,
-  },
-  {
-    id: "mnd_demo_lapsed",
-    intentText: "Household supplies from HomeNeeds. One-day window, ₹500 total.",
-    merchants: [MERCHANTS[2]].map((m) => ({ id: m.id, name: m.name, vpa: m.vpa })),
-    categories: ["household"],
-    perTxnCapPaise: 300_00n,
-    totalCapPaise: 500_00n,
-    velocityMax: null,
-    velocityWindowS: null,
-    expiresInMs: -2 * 60 * 60 * 1000,
-  },
-];
-
-async function seedMandates() {
-  if (!process.env.MANDATE_SIGNING_KEY) {
-    console.log("\n  MANDATE_SIGNING_KEY is not set, so no mandates were issued.");
-    console.log("  Generate one and put it in .env — see .env.example. Without it the");
-    console.log("  console will be empty and there is nothing to run against.\n");
-    return;
-  }
-
-  for (const demo of DEMO_MANDATES) {
-    // Idempotent. Re-seeding must not wipe a mandate that has spending recorded
-    // against it, and must not mint a second copy either.
-    const existing = await prisma.mandate.findUnique({ where: { id: demo.id } });
-    if (existing) {
-      console.log(`  ${demo.id} already exists, left alone.`);
-      continue;
-    }
-
-    await issueMandate({
-      id: demo.id,
-      intentText: demo.intentText,
-      draft: {
-        merchants: demo.merchants,
-        categories: demo.categories,
-        perTxnCapPaise: demo.perTxnCapPaise,
-        totalCapPaise: demo.totalCapPaise,
-        velocityMax: demo.velocityMax,
-        velocityWindowS: demo.velocityWindowS,
-        expiresAt: new Date(Date.now() + demo.expiresInMs).toISOString(),
-        rationale: {},
-      },
-    });
-
-    const state = demo.expiresInMs < 0 ? "expired on purpose" : "active";
-    console.log(`  ${demo.id} signed and issued (${state}).`);
-  }
-}
-
 async function main() {
   console.log("Seeding catalog…");
 
@@ -171,10 +91,7 @@ async function main() {
   console.log(`  ${merchants} merchants, ${products} products.`);
   console.log(`  Injection payload seeded on sku_tv_43 (${PRODUCTS.at(-1)!.name}).`);
 
-  console.log("\nSeeding mandates…");
-  await seedMandates();
-
-  console.log("\nDone. Start the app and press Run on the Agent run screen.");
+  console.log("\nDone. Start the app, sign in, and your account gets its own mandates.");
 }
 
 main()

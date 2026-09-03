@@ -1,6 +1,8 @@
 import { runScripted } from "@/lib/agent/scripted";
 import { sse, type RunEvent } from "@/lib/agent/events";
 import { isChaosMode } from "@/lib/razorpay/chaos";
+import { requireApiUser } from "@/lib/session";
+import { prisma } from "@/lib/db";
 
 /**
  * A run, streamed.
@@ -18,6 +20,9 @@ import { isChaosMode } from "@/lib/razorpay/chaos";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
+  const { user, response } = await requireApiUser();
+  if (response) return response;
+
   let body: {
     mandateId?: string;
     goal?: string;
@@ -33,6 +38,15 @@ export async function POST(request: Request) {
   const { mandateId } = body;
   if (!mandateId) {
     return Response.json({ error: "mandateId is required." }, { status: 400 });
+  }
+
+  // Starting a run spends real money against a mandate, so the caller has to own it.
+  const owned = await prisma.mandate.findFirst({
+    where: { id: mandateId, userId: user.id },
+    select: { id: true },
+  });
+  if (!owned) {
+    return Response.json({ error: "No such mandate." }, { status: 404 });
   }
 
   const goal = body.goal?.trim() || "Restock the weekly essentials.";

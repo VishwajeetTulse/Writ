@@ -15,6 +15,7 @@ import { StatusPill } from "@/components/verdict";
 import { plainReason } from "@/lib/explain";
 import { RevokeButton } from "@/components/revoke-button";
 import { Card, Field, Page } from "@/components/ui";
+import { requireUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
@@ -28,8 +29,9 @@ export const dynamic = "force-dynamic";
  * the terms on this screen are the terms a human signed.
  */
 export default async function MandateDetailPage({ params }: PageProps<"/mandates/[id]">) {
+  const user = await requireUser();
   const { id } = await params;
-  const detail = await getMandateDetail(id);
+  const detail = await getMandateDetail(id, user.id);
   if (!detail) notFound();
 
   const { row, terms, status, signatureValid, purchases, refusals } = detail;

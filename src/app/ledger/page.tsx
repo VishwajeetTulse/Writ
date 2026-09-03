@@ -6,6 +6,7 @@ import { parsePayload, timestamp, violationsFrom } from "@/lib/format";
 import { LedgerRow, type LedgerRowData } from "@/components/ledger-row";
 import { VerifyChain } from "@/components/verify-chain";
 import { Card, Empty, Page } from "@/components/ui";
+import { requireUser } from "@/lib/session";
 import type { Verdict } from "@/lib/policy";
 
 export const dynamic = "force-dynamic";
@@ -30,6 +31,7 @@ const FILTERS: Array<{ label: string; params: Record<string, string> }> = [
  * that was true once.
  */
 export default async function LedgerPage({ searchParams }: PageProps<"/ledger">) {
+  const user = await requireUser();
   const sp = await searchParams;
   const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
@@ -38,8 +40,8 @@ export default async function LedgerPage({ searchParams }: PageProps<"/ledger">)
   const type = one(sp.type) as EventType | undefined;
 
   const [events, total] = await Promise.all([
-    queryLedger({ mandateId, verdict, type, limit: 200 }),
-    prisma.auditEvent.count(),
+    queryLedger({ userId: user.id, mandateId, verdict, type, limit: 200 }),
+    prisma.auditEvent.count({ where: { mandate: { userId: user.id } } }),
   ]);
 
   const activeKey = `${verdict ?? ""}|${type ?? ""}`;

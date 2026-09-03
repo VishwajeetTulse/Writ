@@ -46,6 +46,13 @@ export interface LoadedMandate {
 /**
  * Load a mandate and check its signature.
  *
+ * Deliberately NOT scoped to a signed-in user. This is what the gateway calls, and the
+ * gateway serves agents, not browsers — there is no session on that path. A mandate's
+ * authority comes from its signature and its terms, not from who is looking at it.
+ *
+ * Every function below that serves the console does take a `userId` and does filter on
+ * it. The difference is the point: two callers, two authentication mechanisms.
+ *
  * Expiry is derived at read time rather than trusted from the stored status: a mandate
  * that lapsed while nobody was looking is expired, whether or not a background job ever
  * got round to updating the row.
@@ -102,7 +109,8 @@ export async function getSpendState(
 export async function issueMandate(params: {
   intentText: string;
   draft: MandateDraft;
-  userId?: string;
+  /** Required. A mandate with no owner is authority nobody is accountable for. */
+  userId: string;
   /**
    * Fixed id, for seeded demo mandates only. Everything issued through the API gets a
    * random one — a predictable mandate id would be a guessable handle on someone's
@@ -111,7 +119,7 @@ export async function issueMandate(params: {
   id?: string;
 }): Promise<{ id: string; terms: MandateTerms; signature: string }> {
   const id = params.id ?? newMandateId();
-  const userId = params.userId ?? "demo-user";
+  const userId = params.userId;
   const d = params.draft;
 
   const terms: MandateTerms = {
@@ -174,9 +182,9 @@ export async function issueMandate(params: {
  * status fresh on every call, so flipping the row is the whole mechanism. An agent
  * mid-run loses its authority on its next tool call.
  */
-export async function revokeMandate(id: string): Promise<boolean> {
+export async function revokeMandate(id: string, userId: string): Promise<boolean> {
   const row = await prisma.mandate.findUnique({ where: { id } });
-  if (!row || row.status === "REVOKED") return false;
+  if (!row || row.userId !== userId || row.status === "REVOKED") return false;
 
   await prisma.mandate.update({
     where: { id },
@@ -194,9 +202,11 @@ export async function revokeMandate(id: string): Promise<boolean> {
 }
 
 /** Aggregate spend for the dashboard and the mandate list. */
-export async function getMandateSummary(mandateId: string) {
+export async function getMandateSummary(mandateId: string, userId?: string) {
   const [row, purchases, blocks] = await Promise.all([
-    prisma.mandate.findUnique({ where: { id: mandateId } }),
+    prisma.mandate.findFirst({
+      where: { id: mandateId, ...(userId ? { userId } : {}) },
+    }),
     prisma.purchase.findMany({
       where: { mandateId, status: { in: ["CREATED", "PAID"] } },
       select: { amountPaise: true },
@@ -253,18 +263,18 @@ export interface MandateListItem {
  * Three aggregate queries rather than one per mandate: the list screen is the first
  * thing a judge sees, and it should not get slower as the demo produces more data.
  */
-export async function listMandates(): Promise<MandateListItem[]> {
+export async function listMandates(userId: string): Promise<MandateListItem[]> {
   const [rows, spend, blocks] = await Promise.all([
-    prisma.mandate.findMany({ orderBy: { createdAt: "desc" } }),
+    prisma.mandate.findMany({ where: { userId }, orderBy: { createdAt: "desc" } }),
     prisma.purchase.groupBy({
       by: ["mandateId"],
-      where: { status: { in: ["CREATED", "PAID"] } },
+      where: { status: { in: ["CREATED", "PAID"] }, mandate: { userId } },
       _sum: { amountPaise: true },
       _count: { _all: true },
     }),
     prisma.auditEvent.groupBy({
       by: ["mandateId"],
-      where: { verdict: "BLOCK" },
+      where: { verdict: "BLOCK", mandate: { userId } },
       _count: { _all: true },
       _max: { amountPaise: true },
     }),
@@ -307,9 +317,13 @@ export async function listMandates(): Promise<MandateListItem[]> {
  * valid once" is worth nothing — the check has to run against the row as it exists
  * right now, which is the only way editing a cap in the database shows up as tampering.
  */
-export async function getMandateDetail(id: string) {
+export async function getMandateDetail(id: string, userId: string) {
   const loaded = await loadMandate(id);
-  if (!loaded) return null;
+
+  // Someone else's mandate reads as a mandate that does not exist. Returning a
+  // "forbidden" here would confirm the id is real, which is a small leak but a free
+  // one to avoid.
+  if (!loaded || loaded.row.userId !== userId) return null;
 
   const [purchases, refusals, summary] = await Promise.all([
     prisma.purchase.findMany({
@@ -322,7 +336,7 @@ export async function getMandateDetail(id: string) {
       orderBy: { seq: "desc" },
       take: 20,
     }),
-    getMandateSummary(id),
+    getMandateSummary(id, userId),
   ]);
 
   return {

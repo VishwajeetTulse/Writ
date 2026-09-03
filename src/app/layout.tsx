@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Instrument_Sans, IBM_Plex_Mono } from "next/font/google";
 import { Nav } from "@/components/nav";
+import { currentUser } from "@/lib/session";
+import { signOut } from "@/lib/auth";
 import "./globals.css";
 
 const sans = Instrument_Sans({
@@ -22,11 +24,25 @@ export const metadata: Metadata = {
     "Signed, bounded, revocable spending mandates that let a merchant accept AI-agent traffic without accepting unbookable risk.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  const user = await currentUser();
+
+  async function signOutAction() {
+    "use server";
+    await signOut({ redirectTo: "/sign-in" });
+  }
+
   return (
     <html lang="en" className={`${sans.variable} ${mono.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">
-        <Nav />
+        <Nav
+          user={
+            user
+              ? { name: user.name, email: user.email, image: user.image }
+              : null
+          }
+          signOutAction={signOutAction}
+        />
         <main className="flex-1">{children}</main>
       </body>
     </html>

@@ -27,26 +27,26 @@ export interface SpendingSummary {
   reasons: Array<{ reasonCode: string; count: number; valuePaise: bigint }>;
 }
 
-export async function buildSpendingSummary(): Promise<SpendingSummary> {
+export async function buildSpendingSummary(userId: string): Promise<SpendingSummary> {
   const [agentSpend, settled, stopped, reasons, activeMandates] = await Promise.all([
     prisma.purchase.aggregate({
-      where: { status: { in: ["CREATED", "PAID"] } },
+      where: { status: { in: ["CREATED", "PAID"] }, mandate: { userId } },
       _sum: { amountPaise: true },
       _count: { _all: true },
     }),
-    prisma.purchase.count({ where: { status: "PAID" } }),
+    prisma.purchase.count({ where: { status: "PAID", mandate: { userId } } }),
     prisma.auditEvent.aggregate({
-      where: { verdict: "BLOCK" },
+      where: { verdict: "BLOCK", mandate: { userId } },
       _count: { _all: true },
       _sum: { amountPaise: true },
     }),
     prisma.auditEvent.groupBy({
       by: ["reasonCode"],
-      where: { verdict: "BLOCK", reasonCode: { not: null } },
+      where: { verdict: "BLOCK", reasonCode: { not: null }, mandate: { userId } },
       _count: { _all: true },
       _sum: { amountPaise: true },
     }),
-    prisma.mandate.count({ where: { status: "ACTIVE" } }),
+    prisma.mandate.count({ where: { status: "ACTIVE", userId } }),
   ]);
 
   return {

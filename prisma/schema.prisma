@@ -20,8 +20,16 @@ datasource db {
 
 /// A signed, bounded, revocable grant of spending authority to an AI agent.
 model Mandate {
-  id     String @id // mnd_7f3a2c
-  userId String @default("demo-user")
+  id String @id // mnd_7f3a2c
+
+  /// Who signed this. Every read of a mandate, its purchases and its audit events is
+  /// filtered on this column — that filter is the whole authorisation model.
+  ///
+  /// Deliberately not a foreign key. Sign-in identities come and go (a revoked Google
+  /// account, a deleted user) and a spend record must outlive the account that made it.
+  /// A cascade delete here would erase evidence, which is the one thing this system
+  /// exists to keep.
+  userId String
 
   /// Exactly what the human typed, kept verbatim for the audit trail.
   intentText String
@@ -55,6 +63,7 @@ model Mandate {
   runs        AgentRun[]
 
   @@index([status])
+  @@index([userId])
 }
 
 /// One attempted-and-allowed purchase. Rows only exist for attempts the policy engine ALLOWed.
@@ -178,4 +187,62 @@ model Product {
 
   @@index([merchantId])
   @@index([category])
+}
+
+
+// ---------------------------------------------------------------------------
+// Sign-in. Managed by Auth.js — these four models are its required shape.
+//
+// Note what is NOT here: passwords. Google is the only provider, so this
+// application never sees, stores or transmits a credential.
+// ---------------------------------------------------------------------------
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  createdAt     DateTime  @default(now())
+
+  accounts Account[]
+  sessions Session[]
+}
+
+model Account {
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@id([identifier, token])
 }

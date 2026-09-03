@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { listMandates } from "@/lib/mandate-service";
+import { requireUser } from "@/lib/session";
 import { formatPaise, formatPaiseCompact } from "@/lib/money";
 import { relativeTime, velocityLabel } from "@/lib/format";
 import { Runway } from "@/components/runway";
@@ -18,7 +19,8 @@ export const dynamic = "force-dynamic";
  * that has blocked things is a mandate that is working.
  */
 export default async function MandatesPage() {
-  const mandates = await listMandates();
+  const user = await requireUser();
+  const mandates = await listMandates(user.id);
 
   return (
     <Page

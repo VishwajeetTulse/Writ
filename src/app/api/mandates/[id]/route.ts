@@ -1,4 +1,5 @@
 import { getMandateDetail } from "@/lib/mandate-service";
+import { requireApiUser } from "@/lib/session";
 
 /**
  * One mandate, with its spend and its refusals.
@@ -13,8 +14,11 @@ export async function GET(
   _request: Request,
   ctx: RouteContext<"/api/mandates/[id]">,
 ) {
+  const { user, response } = await requireApiUser();
+  if (response) return response;
+
   const { id } = await ctx.params;
-  const detail = await getMandateDetail(id);
+  const detail = await getMandateDetail(id, user.id);
 
   if (!detail) {
     return Response.json({ error: "No such mandate." }, { status: 404 });

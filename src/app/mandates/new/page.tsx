@@ -1,6 +1,7 @@
 import { listMerchants, searchCatalog } from "@/lib/catalog";
 import { MandateForm } from "@/components/mandate-form";
 import { Page } from "@/components/ui";
+import { requireUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +14,8 @@ export const dynamic = "force-dynamic";
  * before the policy engine sees them, so every comparison is still integer paise.
  */
 export default async function NewMandatePage() {
+  await requireUser();
+
   const [merchants, products] = await Promise.all([
     listMerchants(),
     searchCatalog({ limit: 200 }),

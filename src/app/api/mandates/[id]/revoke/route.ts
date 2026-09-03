@@ -1,4 +1,5 @@
 import { revokeMandate } from "@/lib/mandate-service";
+import { requireApiUser } from "@/lib/session";
 
 /**
  * Revoke a mandate.
@@ -19,8 +20,11 @@ export async function POST(
   _request: Request,
   ctx: RouteContext<"/api/mandates/[id]/revoke">,
 ) {
+  const { user, response } = await requireApiUser();
+  if (response) return response;
+
   const { id } = await ctx.params;
-  const revoked = await revokeMandate(id);
+  const revoked = await revokeMandate(id, user.id);
 
   if (!revoked) {
     return Response.json(
