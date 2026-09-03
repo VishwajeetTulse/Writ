@@ -39,12 +39,27 @@ function credentials(): { keyId: string; keySecret: string } {
         "and put them in .env — see .env.example.",
     );
   }
+  // Live keys are refused here rather than in a startup check, because this is the
+  // only function in the codebase that reads them. Every path to money runs through
+  // it, so there is no route to a live charge that skips this line — which is a much
+  // stronger guarantee than a guard someone has to remember to call.
+  if (!keyId.startsWith(TEST_KEY_PREFIX)) {
+    throw new Error(
+      `Refusing to use Razorpay key "${keyId.slice(0, 12)}…": this is not a test-mode ` +
+        `key. Writ is a prototype and never runs against live keys. Test key ids begin ` +
+        `with "${TEST_KEY_PREFIX}".`,
+    );
+  }
+
   return { keyId, keySecret };
 }
 
-/** True when test-mode keys are configured. Test keys are prefixed `rzp_test_`. */
+/** Razorpay test-mode key ids carry this prefix. Live ones do not. */
+const TEST_KEY_PREFIX = "rzp_test_";
+
+/** True when test-mode keys are configured. */
 export function isTestMode(): boolean {
-  return (process.env.RAZORPAY_KEY_ID ?? "").startsWith("rzp_test_");
+  return (process.env.RAZORPAY_KEY_ID ?? "").startsWith(TEST_KEY_PREFIX);
 }
 
 interface RequestOptions {
