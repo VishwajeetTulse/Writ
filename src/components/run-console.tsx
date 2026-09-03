@@ -6,6 +6,7 @@ import type { RunEvent } from "@/lib/agent/events";
 import { formatPaise } from "@/lib/money";
 import { Runway } from "@/components/runway";
 import { VerdictPill } from "@/components/verdict";
+import { explainDecision } from "@/lib/explain";
 import { Card } from "@/components/ui";
 
 /**
@@ -43,6 +44,66 @@ interface Narration {
   kind: "plan" | "note";
   text: string;
   tone?: "plain" | "warn";
+}
+
+/**
+ * Explain one decision, inline, with no round trip.
+ *
+ * `explainDecision` is a pure function over recorded evidence, so it runs in the browser
+ * and produces exactly the sentence `/api/explain` would return for the same decision.
+ * The ledger screen deliberately goes through the endpoint instead; here, during a live
+ * run, an instant answer matters more than exercising the route.
+ */
+function DecisionExplanation({
+  decision,
+}: {
+  decision: Extract<RunEvent, { type: "decision" }>;
+}) {
+  const [open, setOpen] = useState(false);
+
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        className="mt-2 rounded border border-line px-2 py-0.5 text-[11px] text-ink-mute transition-colors hover:border-line-strong hover:text-ink"
+      >
+        Explain
+      </button>
+    );
+  }
+
+  const explanation = explainDecision({
+    verdict: decision.verdict,
+    reasonCode: decision.reasonCode,
+    evidence: (decision.violations[0]?.evidence ?? {}) as Record<string, unknown>,
+    violations: decision.violations,
+    productName: decision.productName,
+    latencyUs: decision.latencyUs,
+  });
+
+  return (
+    <div className="mt-2 rounded border border-line bg-ground/70 px-2.5 py-2">
+      <p className="text-[12px] leading-relaxed">{explanation.text}</p>
+
+      {explanation.facts.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5">
+          {explanation.facts.map((f) => (
+            <div key={f.label}>
+              <div className="eyebrow">{f.label}</div>
+              <div className="font-mono text-[11px] tnum">{f.value}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <button
+        onClick={() => setOpen(false)}
+        className="mt-2 text-[11px] text-ink-mute underline underline-offset-2"
+      >
+        Hide
+      </button>
+    </div>
+  );
 }
 
 export function RunConsole({ mandates }: { mandates: RunMandate[] }) {
@@ -428,6 +489,8 @@ export function RunConsole({ mandates }: { mandates: RunMandate[] }) {
                             </div>
                           </div>
                         )}
+
+                        <DecisionExplanation decision={a.decision} />
 
                         {a.decision.recovered && (
                           <div className="mt-1.5 rounded border border-hold/25 bg-hold-wash px-2 py-1.5 text-[11px] leading-relaxed text-hold">

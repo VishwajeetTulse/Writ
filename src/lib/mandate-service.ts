@@ -103,8 +103,14 @@ export async function issueMandate(params: {
   intentText: string;
   draft: MandateDraft;
   userId?: string;
+  /**
+   * Fixed id, for seeded demo mandates only. Everything issued through the API gets a
+   * random one — a predictable mandate id would be a guessable handle on someone's
+   * spending authority.
+   */
+  id?: string;
 }): Promise<{ id: string; terms: MandateTerms; signature: string }> {
-  const id = newMandateId();
+  const id = params.id ?? newMandateId();
   const userId = params.userId ?? "demo-user";
   const d = params.draft;
 
