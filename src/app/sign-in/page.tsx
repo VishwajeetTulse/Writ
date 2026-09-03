@@ -14,6 +14,18 @@ export const dynamic = "force-dynamic";
  * If Google is not configured yet, the page says so and says what to do about it,
  * rather than failing at the redirect with something unreadable.
  */
+/** What each Auth.js error actually means for the person reading it. */
+const SIGN_IN_ERRORS: Record<string, string> = {
+  AccessDenied:
+    "Google did not let that sign-in through. Try again, or use a different account.",
+  Configuration:
+    "Sign-in is misconfigured on the server, so this is not something you can fix from here. Check the server log for the underlying error.",
+  OAuthAccountNotLinked:
+    "That email address is already registered through a different sign-in method.",
+  OAuthCallback: "Google returned an error on the way back. Try again.",
+  Verification: "That sign-in link has already been used, or it expired.",
+};
+
 export default async function SignInPage({ searchParams }: PageProps<"/sign-in">) {
   const user = await currentUser();
   if (user) redirect("/");
@@ -35,11 +47,14 @@ export default async function SignInPage({ searchParams }: PageProps<"/sign-in">
       </p>
 
       {errorParam && (
-        <p className="mt-5 rounded-md border border-deny/25 bg-deny-wash px-3.5 py-2.5 text-[13px] leading-relaxed text-deny">
-          {errorParam === "AccessDenied"
-            ? "Google did not let that sign-in through. Try again, or use a different account."
-            : "Something went wrong signing you in. Try again."}
-        </p>
+        <div className="mt-5 rounded-md border border-deny/25 bg-deny-wash px-3.5 py-2.5">
+          <p className="text-[13px] leading-relaxed text-deny">
+            {SIGN_IN_ERRORS[errorParam] ?? "Something went wrong signing you in."}
+          </p>
+          {/* The code, always. "Something went wrong" is useless to whoever has to
+              fix it, and this page is the only place the reason surfaces. */}
+          <p className="mt-1.5 font-mono text-[11px] text-deny/80">{errorParam}</p>
+        </div>
       )}
 
       {configured ? (
