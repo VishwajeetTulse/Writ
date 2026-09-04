@@ -54,6 +54,7 @@ export function CatalogBrowser({
   const [category, setCategory] = useState("");
   const [merchantId, setMerchantId] = useState("");
   const [coveredOnly, setCoveredOnly] = useState(false);
+  const [sort, setSort] = useState<"price" | "price-desc" | "name">("price");
 
   const categories = useMemo(
     () =>
@@ -85,17 +86,32 @@ export function CatalogBrowser({
           );
         }),
       }))
+      .map((m) => ({
+        ...m,
+        products: [...m.products].sort((a, b) =>
+          sort === "name"
+            ? a.name.localeCompare(b.name)
+            : sort === "price-desc"
+              ? b.pricePaise - a.pricePaise
+              : a.pricePaise - b.pricePaise,
+        ),
+      }))
       .filter((m) => m.products.length > 0);
-  }, [merchants, query, category, merchantId, coveredOnly]);
+  }, [merchants, query, category, merchantId, coveredOnly, sort]);
 
   const shown = filtered.reduce((n, m) => n + m.products.length, 0);
   const narrowed = shown !== total;
+  const covered = filtered.reduce(
+    (n, m) => n + m.products.filter((p) => p.coverage.kind === "covered").length,
+    0,
+  );
 
   function clear() {
     setQuery("");
     setCategory("");
     setMerchantId("");
     setCoveredOnly(false);
+    setSort("price");
   }
 
   return (
@@ -137,6 +153,17 @@ export function CatalogBrowser({
           ))}
         </select>
 
+        <select
+          value={sort}
+          onChange={(e) => setSort(e.target.value as typeof sort)}
+          aria-label="Sort items"
+          className={`${controlBase} h-[34px] w-auto`}
+        >
+          <option value="price">Cheapest first</option>
+          <option value="price-desc">Dearest first</option>
+          <option value="name">By name</option>
+        </select>
+
         {signedIn && hasMandates && (
           <label className="flex h-[34px] shrink-0 cursor-pointer items-center gap-2 rounded-sm border border-line bg-surface px-3 text-ui text-ink-mute transition-colors hover:border-line-strong">
             <input
@@ -150,7 +177,15 @@ export function CatalogBrowser({
         )}
 
         <span className="ml-auto font-mono text-micro tnum text-ink-soft">
-          {narrowed ? `${shown} of ${total} items` : `${total} items · ${merchants.length} shops`}
+          {narrowed ? `${shown} of ${total}` : `${total} items`}
+          {signedIn && hasMandates && (
+            <>
+              <span aria-hidden className="mx-1.5 text-line-strong">·</span>
+              <span className={covered > 0 ? "text-permit" : undefined}>
+                {covered} covered
+              </span>
+            </>
+          )}
         </span>
       </div>
 
@@ -182,6 +217,10 @@ function MerchantListing({
   merchant: CatalogMerchantView;
   signedIn: boolean;
 }) {
+  const prices = merchant.products.map((p) => p.pricePaise);
+  const low = Math.min(...prices);
+  const high = Math.max(...prices);
+
   return (
     <section>
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-line pb-2.5">
@@ -192,45 +231,55 @@ function MerchantListing({
         <span className="rounded-xs border border-line px-1.5 py-0.5 font-mono text-nano uppercase tracking-[0.07em] text-ink-soft">
           {merchant.category}
         </span>
+        {signedIn && (
+          <span
+            className={`font-mono text-nano uppercase tracking-[0.07em] ${
+              merchant.mandateCount > 0 ? "text-permit" : "text-ink-soft"
+            }`}
+          >
+            {merchant.mandateCount > 0
+              ? `${merchant.mandateCount} mandate${merchant.mandateCount === 1 ? "" : "s"}`
+              : "no mandate"}
+          </span>
+        )}
 
-        <span className="ml-auto text-small text-ink-mute">
-          {signedIn
-            ? merchant.mandateCount > 0
-              ? `Covered by ${merchant.mandateCount} of your mandates`
-              : "No mandate of yours covers this shop"
-            : `${merchant.products.length} items`}
+        <span className="ml-auto font-mono text-micro tnum text-ink-soft">
+          {merchant.products.length} items · {formatPaise(BigInt(low), { showPaise: false })}
+          {low === high ? "" : `–${formatPaise(BigInt(high), { showPaise: false })}`}
         </span>
       </div>
 
       <ul className="divide-y divide-hairline border-b border-hairline">
         {merchant.products.map((p) => (
-          <li key={p.sku} className="flex items-start gap-5 py-3.5">
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
-                <span className="text-body">{p.name}</span>
-                <span className="font-mono text-nano text-ink-soft">{p.sku}</span>
-                {!p.inStock && (
-                  <span className="font-mono text-nano uppercase tracking-[0.07em] text-ink-soft">
-                    out of stock
-                  </span>
-                )}
-              </div>
+          <li
+            key={p.sku}
+            className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-6 gap-y-1 py-3"
+          >
+            <div className="min-w-0">
+              <span className="text-body">{p.name}</span>
+              <span className="ml-2.5 font-mono text-nano text-ink-soft">{p.sku}</span>
+              {!p.inStock && (
+                <span className="ml-2.5 font-mono text-nano uppercase tracking-[0.07em] text-ink-soft">
+                  out of stock
+                </span>
+              )}
+            </div>
 
-              <p className="mt-1 line-clamp-1 max-w-[76ch] text-small leading-relaxed text-ink-soft">
-                {p.description}
-              </p>
+            <div className="text-right font-mono text-body tnum">
+              {formatPaise(BigInt(p.pricePaise), { showPaise: false })}
+            </div>
+
+            <div className="col-start-1 min-w-0">
+              <p className="line-clamp-1 text-small text-ink-soft">{p.description}</p>
 
               {p.addressesAgents && (
-                <p className="mt-2 border-l-2 border-hold/50 pl-2.5 text-small text-hold">
+                <p className="mt-1.5 border-l-2 border-hold/50 pl-2.5 text-small text-hold">
                   Contains instructions aimed at AI agents.
                 </p>
               )}
             </div>
 
-            <div className="shrink-0 text-right">
-              <div className="font-mono text-body tnum">
-                {formatPaise(BigInt(p.pricePaise), { showPaise: false })}
-              </div>
+            <div className="col-start-2 text-right">
               <CoverageNote coverage={p.coverage} />
             </div>
           </li>
@@ -247,7 +296,7 @@ function MerchantListing({
 function CoverageNote({ coverage }: { coverage: Coverage }) {
   if (coverage.kind === "covered") {
     return (
-      <div className="mt-1 text-small text-permit" title={coverage.mandateIntent}>
+      <div className="text-small text-permit" title={coverage.mandateIntent}>
         Covered
       </div>
     );
@@ -261,7 +310,7 @@ function CoverageNote({ coverage }: { coverage: Coverage }) {
       coverage.reasonCode === "CATEGORY_NOT_ALLOWED";
 
     return (
-      <div className={`mt-1 text-small ${scope ? "text-ink-soft" : "text-deny"}`}>
+      <div className={`text-small ${scope ? "text-ink-soft" : "text-deny"}`}>
         {coverage.note}
       </div>
     );

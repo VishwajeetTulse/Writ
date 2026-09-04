@@ -48,8 +48,9 @@
  * product: in an interface about whether money may move, a colour that means nothing
  * would dilute the three that mean everything.
  *
- * Deliberately light-only. This is a console shown on a projector under conference
- * lighting, and a theme that follows the viewer's OS is a way to lose the demo.
+ * Light and dark, following the viewer's system setting unless they say otherwise. The
+ * light palette is the source of truth below; dark redefines the same tokens and nothing
+ * else, so a component never knows which theme it is in.
  */
 
 @theme {
@@ -80,6 +81,9 @@
   --color-deny-wash: #fbeae6;
   --color-hold: #8f5f10;
   --color-hold-wash: #f9f1e1;
+
+  /* The hatch drawn beyond the runway's wall. Ink at low opacity in either theme. */
+  --hatch: rgba(22, 21, 15, 0.05);
 
   --font-sans: var(--font-instrument-sans), ui-sans-serif, system-ui, sans-serif;
   --font-serif: var(--font-newsreader), ui-serif, Georgia, serif;
@@ -114,8 +118,72 @@
   --radius-lg: 10px;
 }
 
+/*
+ * Dark.
+ *
+ * Only tokens are redefined — every measurement, radius and type size is shared. The
+ * neutrals stay warm rather than going blue-black, so the dark theme reads as the same
+ * paper seen at night rather than as a different product.
+ *
+ * Two selectors, deliberately. The media query covers "follow my system", and is written
+ * so an explicit light choice wins inside it. The attribute selector covers an explicit
+ * dark choice in a system set to light.
+ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --color-ground: #14130f;
+    --color-surface: #1c1b16;
+    --color-sunk: #0e0d0a;
+    --color-hairline: #29271f;
+    --color-line: #34322a;
+    --color-line-strong: #4d4a40;
+    --color-ink: #f4f2ec;
+    --color-ink-mute: #b0aca1;
+    --color-ink-soft: #8f8b82;
+
+    --color-permit: #52c795;
+    --color-permit-wash: #10241b;
+    --color-deny: #ff8265;
+    --color-deny-wash: #2b1310;
+    --color-hold: #e0a949;
+    --color-hold-wash: #271c0b;
+
+    --hatch: rgba(244, 242, 236, 0.06);
+  }
+}
+
+:root[data-theme="dark"] {
+  --color-ground: #14130f;
+  --color-surface: #1c1b16;
+  --color-sunk: #0e0d0a;
+  --color-hairline: #29271f;
+  --color-line: #34322a;
+  --color-line-strong: #4d4a40;
+  --color-ink: #f4f2ec;
+  --color-ink-mute: #b0aca1;
+  --color-ink-soft: #8f8b82;
+
+  --color-permit: #52c795;
+  --color-permit-wash: #10241b;
+  --color-deny: #ff8265;
+  --color-deny-wash: #2b1310;
+  --color-hold: #e0a949;
+  --color-hold-wash: #271c0b;
+
+  --hatch: rgba(244, 242, 236, 0.06);
+}
+
+/* Native controls — scrollbars, date pickers, the caret — follow the theme too. */
 html {
+  color-scheme: light dark;
+}
+
+html[data-theme="light"] {
   color-scheme: light;
+}
+
+html[data-theme="dark"] {
+  color-scheme: dark;
 }
 
 body {
@@ -208,4 +276,13 @@ body {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* Beyond the runway's wall: out of bounds, not headroom. */
+.hatch {
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent 0 5px,
+    var(--hatch) 5px 6px
+  );
 }

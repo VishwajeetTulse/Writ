@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { buttonClass } from "@/components/ui";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 /**
  * The masthead.
@@ -83,6 +84,8 @@ export function Nav({
         </nav>
 
         <div className="ml-auto flex shrink-0 items-center gap-3 self-center">
+          <ThemeToggle />
+
 
           {user && (
             <>

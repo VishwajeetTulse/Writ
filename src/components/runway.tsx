@@ -78,14 +78,7 @@ export function Runway({
         }`}
       >
         {/* Beyond the wall. Hatched, because it is not headroom — it is out of bounds. */}
-        <div
-          className="absolute inset-y-0 right-0"
-          style={{
-            left: `${WALL_PCT}%`,
-            backgroundImage:
-              "repeating-linear-gradient(45deg, transparent 0 5px, rgba(22,21,15,0.05) 5px 6px)",
-          }}
-        />
+        <div className="hatch absolute inset-y-0 right-0" style={{ left: `${WALL_PCT}%` }} />
 
         {/* Spent. */}
         <div

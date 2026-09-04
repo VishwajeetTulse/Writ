@@ -51,6 +51,20 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`${sans.variable} ${mono.variable} ${serif.variable} h-full antialiased`}
     >
+      <head>
+        {/*
+          Runs before the first paint, so a viewer who chose light or dark never sees a
+          frame of the other one. It only sets an attribute; the CSS does the rest, and
+          an untouched preference falls through to prefers-color-scheme.
+        */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "try{var t=localStorage.getItem('writ-theme');" +
+              "if(t==='light'||t==='dark'){document.documentElement.dataset.theme=t}}catch(e){}",
+          }}
+        />
+      </head>
       <body className="flex min-h-full flex-col">
         {/* Keyboard users land here first and can jump the navigation entirely. */}
         <a
