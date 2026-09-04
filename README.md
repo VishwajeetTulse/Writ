@@ -127,7 +127,7 @@ Anthropic key.
 | A mandate is a real UPI Autopay mandate | `npm run autopay:probe` | Compiles the signed terms into a token and creates the authorisation order |
 | The whole gated path works | `npm run gate2` | 10 assertions end to end, real orders |
 | Webhooks cannot be forged | `npm run webhook:test` | Rejects unsigned, wrong-signature and tampered bodies |
-| Settlement survives a dropped webhook | `npm run reconcile` | Pulls status from Razorpay and compares amounts |
+| The ledger has not drifted from Razorpay | `npm run reconcile` | Two passes: did anything settle without us hearing, and does Razorpay confirm everything we call settled |
 | Revocation lands on the next call | `npm run revoke:test` | Revokes mid-run, asserts the next attempt is refused |
 | The audit trail was not edited | `curl 'localhost:3000/api/ledger?verify=1'` | Rehashes the entire chain |
 | Every money action is explainable | `curl 'localhost:3000/api/explain?seq=42'` | Renders a recorded decision into prose, from its own arithmetic |
@@ -331,6 +331,19 @@ process, and Turbopack was serving a chunk compiled before the auth models exist
 Fixed by killing the listener by PID and clearing `.next`. The lasting fix was to the
 sign-in page, which now prints the actual Auth.js error code instead of "something went
 wrong" — the word `Configuration` would have pointed at the server in the first minute.
+
+**Reconciliation was checking the safe half of the ledger.** `reconcileOutstanding`
+queried `status: "CREATED"` and printed "Ledger agrees with Razorpay" — a claim about
+every purchase, backed by a look at the pending ones. It could catch a settlement we had
+missed and was structurally incapable of catching one we had invented, which is the
+worse direction: a purchase wrongly marked paid asserts that money moved when it did
+not. Now it runs a second pass over everything it calls settled and asks Razorpay to
+confirm each one. On this database it immediately found three, all created by
+`npm run webhook:test`, which fabricates correctly-signed events. Nothing can tell a
+forged-but-validly-signed webhook from a real one — that is what a valid signature
+means — but reconciliation can go to the source and ask, and it does. It records each
+disagreement in the audit trail and changes no status, because deciding what a
+discrepancy means is a human's job.
 
 **Razorpay rejected the UPI authorisation order.** A mandate grants future authority
 without collecting anything, so the order was created for zero, and the API returned

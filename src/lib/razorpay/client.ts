@@ -151,8 +151,14 @@ function throwInjected(mode: ChaosMode): never {
 export interface RazorpayOrder {
   id: string;
   amount: number;
+  /** How much has actually been collected. Zero until someone pays the order. */
+  amount_paid: number;
+  amount_due: number;
   currency: string;
+  /** created | attempted | paid */
   status: string;
+  /** Payment attempts made against this order. Zero means nobody has tried. */
+  attempts: number;
   receipt?: string;
   created_at: number;
   notes?: Record<string, string>;
