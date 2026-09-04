@@ -213,10 +213,11 @@ the same event stream. The console does not change.
 | | |
 |---|---|
 | **Mandates** | Every grant, what it permits, what it has spent, what it refused |
+| **Catalog** | The shops and stock an AI buyer can see, with each item marked against your own mandates. Open without an account, the same list the agent reads as JSON |
 | **New mandate** | Set the bounds and read what they mean. The preview runs the *real* policy engine in the browser against the live catalog, so before you sign you can see which products it permits and which it refuses, with the reason code for each |
 | **Activity** | Split pane. What the buyer did on the left, what the gateway decided on the right. Nothing crosses between them except a SKU and a quantity |
 | **Ledger** | The hash-chained trail, filterable by cause, with live chain verification |
-| **Impact** | Agent-originated GMV, purchases per human approval, value refused, latency, chain status |
+| **Spending** | What was spent, what is left on each mandate, and why purchases were stopped |
 
 The spend runway is the signature element. A progress bar shows consumption; it cannot
 show a boundary being enforced. So the cap is drawn as a wall with space beyond it, and

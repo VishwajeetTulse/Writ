@@ -4,10 +4,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const LINKS = [
-  { href: "/", label: "Mandates" },
-  { href: "/run", label: "Activity" },
-  { href: "/ledger", label: "Ledger" },
-  { href: "/impact", label: "Spending" },
+  { href: "/", label: "Mandates", open: false },
+  { href: "/catalog", label: "Catalog", open: true },
+  { href: "/run", label: "Activity", open: false },
+  { href: "/ledger", label: "Ledger", open: false },
+  { href: "/impact", label: "Spending", open: false },
 ];
 
 export interface NavUser {
@@ -25,6 +26,10 @@ export function Nav({
 }) {
   const pathname = usePathname();
 
+  // Signed out, the only destination that would not bounce straight back to sign-in is
+  // the catalog — and that one is meant to be readable cold, by a person or an agent.
+  const links = user ? LINKS : LINKS.filter((link) => link.open);
+
   return (
     <header className="border-b border-line bg-surface">
       <div className="mx-auto flex h-14 max-w-[1400px] items-center gap-6 overflow-x-auto px-6">
@@ -33,31 +38,27 @@ export function Nav({
           <span className="eyebrow hidden sm:inline">spending authority</span>
         </Link>
 
-        {/* Signed-out visitors get no navigation, because every destination would
-            bounce them straight back to sign-in. */}
-        {user && (
-          <nav className="flex shrink-0 items-center gap-1">
-            {LINKS.map((link) => {
-              const active =
-                link.href === "/"
-                  ? pathname === "/" || pathname.startsWith("/mandates")
-                  : pathname.startsWith(link.href);
-              return (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className={`whitespace-nowrap rounded px-3 py-1.5 text-[13px] transition-colors ${
-                    active
-                      ? "bg-ground font-medium text-ink"
-                      : "text-ink-mute hover:text-ink"
-                  }`}
-                >
-                  {link.label}
-                </Link>
-              );
-            })}
-          </nav>
-        )}
+        <nav className="flex shrink-0 items-center gap-1">
+          {links.map((link) => {
+            const active =
+              link.href === "/"
+                ? pathname === "/" || pathname.startsWith("/mandates")
+                : pathname.startsWith(link.href);
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={`whitespace-nowrap rounded px-3 py-1.5 text-[13px] transition-colors ${
+                  active
+                    ? "bg-ground font-medium text-ink"
+                    : "text-ink-mute hover:text-ink"
+                }`}
+              >
+                {link.label}
+              </Link>
+            );
+          })}
+        </nav>
 
         <div className="ml-auto flex shrink-0 items-center gap-3">
           <span className="hidden rounded border border-line px-2 py-1 font-mono text-[10px] uppercase tracking-[0.08em] text-ink-mute md:inline">

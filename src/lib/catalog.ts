@@ -101,3 +101,17 @@ export async function searchCatalog(opts: SearchOptions = {}): Promise<CatalogPr
 export async function listMerchants() {
   return prisma.merchant.findMany({ orderBy: { name: "asc" } });
 }
+
+/**
+ * Does this product description talk to an AI agent rather than to a shopper?
+ *
+ * A merchant controls its own product text, so that text is the attacker's channel
+ * into any AI buyer that reads it. This is a naive marker match, not a defence —
+ * the defence is that the policy engine never reads the description at all. It exists
+ * so the console can point at the one seeded product that carries such a payload.
+ */
+export function addressesAgents(description: string): boolean {
+  return /system note|ignore (all )?previous|ai (shopping )?assistant|you are (authorised|authorized|instructed|expected)/i.test(
+    description,
+  );
+}
