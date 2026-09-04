@@ -10,15 +10,13 @@ import type { RunEvent } from "./events";
 /**
  * Everything a model-driven buyer needs that is not the model.
  *
- * Two drivers exist — Gemini and Claude — and the only thing that should differ between
- * them is how a request is shaped and how a tool call is read back out. The tools
- * themselves, the run lifecycle, the spend reporting and the system prompt all live
- * here, because a purchase tool that existed in two copies would eventually behave two
- * ways, and this is the one function in the codebase that moves money.
+ * The model driver in `gemini.ts` shapes a request and reads a tool call back out.
+ * Everything else — the tools, the run lifecycle, the spend reporting, the system
+ * prompt, and the one function that can move money — lives here, where the scripted
+ * buyer can reach it too and where there is only ever one copy of it.
  *
- * The tool schemas below are plain JSON Schema on purpose. Anthropic takes them as
- * `input_schema` and Google takes them as `parametersJsonSchema`, so neither driver has
- * to translate and neither can quietly disagree with the other about what a tool accepts.
+ * The tool schemas below are plain JSON Schema, which Google takes directly as
+ * `parametersJsonSchema`. Nothing has to translate them.
  */
 
 export interface BuyerCtx {
@@ -135,7 +133,7 @@ export interface BuyerSession {
  */
 export async function startBuyer(
   ctx: BuyerCtx,
-  driver: "claude" | "gemini",
+  driver: "gemini",
 ): Promise<BuyerSession | null> {
   const { mandateId, goal, emit } = ctx;
 

@@ -2,7 +2,6 @@ import Link from "next/link";
 import { listMandates } from "@/lib/mandate-service";
 import { requireUser } from "@/lib/session";
 import { RunConsole } from "@/components/run-console";
-import { claudeAvailable } from "@/lib/agent/claude";
 import { geminiAvailable, geminiModel } from "@/lib/agent/gemini";
 import { buttonClass, Empty, Page } from "@/components/ui";
 
@@ -40,7 +39,6 @@ export default async function RunPage() {
         </Empty>
       ) : (
         <RunConsole
-          claudeReady={claudeAvailable()}
           geminiReady={geminiAvailable()}
           geminiModel={geminiModel()}
           mandates={mandates.map((m) => ({

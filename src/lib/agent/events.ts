@@ -3,11 +3,11 @@ import type { PolicyViolation } from "../policy";
 /**
  * What a run streams to the console.
  *
- * This shape is deliberately independent of *what is driving the run*. There are three
- * drivers — a Gemini tool loop, a Claude tool loop, and a scripted buyer with no model
- * in it at all — and they emit exactly these events. The console renders them
- * identically, because the interesting half of a run was never the model: it is the
- * sequence of gateway decisions, and those are produced by the same code either way.
+ * This shape is deliberately independent of *what is driving the run*. A real model and
+ * a scripted buyer with no model in it at all emit exactly these events, and the console
+ * renders them identically — because the interesting half of a run was never the model.
+ * It is the sequence of gateway decisions, and those are produced by the same code
+ * either way.
  *
  * The `driver` field on `run_started` is how the UI stays honest about which one ran.
  */
@@ -17,7 +17,7 @@ export type RunEvent =
       type: "run_started";
       runId: string;
       goal: string;
-      driver: "scripted" | "gemini" | "claude";
+      driver: "scripted" | "gemini";
       chaos: string | null;
     }
   /** The buyer's reasoning, in its own words. Never trusted, only displayed. */

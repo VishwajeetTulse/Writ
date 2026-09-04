@@ -116,8 +116,7 @@ coordinated, which is exactly why it cannot fail to arrive.
 
 ## Every claim, and how to check it
 
-Each of these runs against real Razorpay test-mode APIs. None of them need the
-Anthropic key.
+Each of these runs against real Razorpay test-mode APIs. None of them need a model key.
 
 | Claim | Command | What it proves |
 |---|---|---|
@@ -244,12 +243,15 @@ Studio. `GEMINI_MODEL` picks the model and `npm run gemini:models` says which on
 can actually reach — it makes a real tool call against each rather than listing, because
 listing proves nothing. `gemini-2.5-flash` appears in the list and 404s on use.
 
-**Claude** (`src/lib/agent/claude.ts`) is the same loop against `claude-opus-5`, needing
-either `ANTHROPIC_API_KEY` or `GOOGLE_CLOUD_PROJECT` and `CLOUD_ML_REGION` for Vertex AI.
+The free tier meters 20 requests a day per model, and one run costs a request per turn,
+so the driver walks a chain of models: one that is out of quota is abandoned at once, one
+that is merely busy is backed off and retried.
 
-Both drivers share `buyer.ts`, which holds the tools, the system prompt, the run
-lifecycle and the one function that can move money. Only request shaping differs between
-them. A purchase tool with two implementations would eventually behave two ways. The model is told the mandate's terms so it can plan sensibly and
+`buyer.ts` holds the tools, the system prompt, the run lifecycle and the one function
+that can move money, so the scripted buyer and the model reach the same code and the
+money path has exactly one implementation.
+
+The model is told the mandate's terms so it can plan sensibly and
 is trusted with none of them — `attempt_purchase` takes a SKU and a quantity, and the
 gateway prices the SKU itself. It may also pass a `claimed_amount_paise`, which is
 recorded and then ignored; when it disagrees with the catalog, the console says so.
@@ -448,7 +450,7 @@ Stated plainly, because a security claim with unstated boundaries is worth nothi
 - **`webhook:test` signs a body; it does not fake a payment.** The purchase and the
   order it settles are real, created by the gateway against Razorpay's test API. Only
   the delivery of the notification is simulated.
-- **The buyer is scripted unless an Anthropic key is set.** See above.
+- **The buyer is scripted unless `GEMINI_API_KEY` is set.** See above.
 - **You cannot write a mandate in a sentence.** The form takes shops, categories
   and numbers directly. Drafting terms from natural language and clamping them
   against server-side ceilings is the obvious next thing to build, and is not built.
@@ -463,7 +465,7 @@ documented in `prisma/seed.ts`.
 
 Next.js 16 (App Router, Turbopack) · React 19 · Tailwind v4 · Prisma 7 on SQLite ·
 Auth.js with Google · Vitest · Razorpay test-mode REST · Google Gen AI SDK for the buyer
-agent, with the Anthropic SDK as an alternative driver. Both optional.
+agent, optional.
 
 Three typefaces, one rule each: Newsreader for what a person wrote or is being told, IBM
 Plex Mono for what the machine computed, Instrument Sans for the chrome. A reader can

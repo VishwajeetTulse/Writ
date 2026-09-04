@@ -10,10 +10,10 @@ import { MAX_TURNS, startBuyer, TOOL_SCHEMAS, type BuyerCtx } from "./buyer";
  * nobody wrote a script for.
  *
  * Everything that matters — the tools, the system prompt, the run lifecycle, the one
- * function that can move money — lives in `buyer.ts` and is shared with the Claude
- * driver. What is left here is the shape of a Gemini request and how a tool call is
- * read back out of the response. That split is deliberate: a purchase tool with two
- * implementations would eventually behave two ways.
+ * function that can move money — lives in `buyer.ts`, where the scripted buyer reaches
+ * it too. What is left here is the shape of a Gemini request and how a tool call is
+ * read back out of the response. That split is deliberate: the money path should not be
+ * something a driver owns a copy of.
  *
  * Two details worth knowing about this API. Tool results go back as a **user** turn
  * carrying `functionResponse` parts, not as their own role. And thinking parts arrive

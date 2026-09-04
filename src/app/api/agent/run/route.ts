@@ -1,5 +1,4 @@
 import { runScripted } from "@/lib/agent/scripted";
-import { claudeAvailable, runClaude } from "@/lib/agent/claude";
 import { geminiAvailable, runGemini } from "@/lib/agent/gemini";
 import { sse, type RunEvent } from "@/lib/agent/events";
 import { isChaosMode } from "@/lib/razorpay/chaos";
@@ -15,7 +14,7 @@ import { prisma } from "@/lib/db";
  * nothing about when the enforcement happened.
  *
  * The driver is chosen here and nowhere else, and it is the only thing about a run that
- * changes. `claude` is a real tool loop against a real model; `scripted` is a fixed
+ * changes. `gemini` is a real tool loop against a real model; `scripted` is a fixed
  * sequence that needs no key, no tokens and no network beyond Razorpay. Both emit the
  * same events, and every verdict on the screen is produced by the same gateway either
  * way — which is precisely the claim being made. The console labels which one ran.
@@ -34,8 +33,8 @@ export async function POST(request: Request) {
     pauseForRevocation?: boolean;
     /** Tell the buyer its limits. Off by default; see buyer.ts. */
     briefed?: boolean;
-    /** "auto" prefers whichever model is configured, Gemini first. */
-    driver?: "auto" | "gemini" | "claude" | "scripted";
+    /** "auto" uses the model when a key is set, and the scripted buyer otherwise. */
+    driver?: "auto" | "gemini" | "scripted";
   };
   try {
     body = (await request.json()) as typeof body;
@@ -72,35 +71,20 @@ export async function POST(request: Request) {
 
       try {
         const wanted = body.driver ?? "auto";
-
-        // "auto" picks whatever is actually reachable, preferring Gemini because that is
-        // the key this project is configured with. Asking for a driver whose credentials
-        // are missing says so and falls back, rather than quietly running something else
-        // and letting the label do the lying.
         const resolved =
-          wanted === "auto"
-            ? geminiAvailable()
-              ? "gemini"
-              : claudeAvailable()
-                ? "claude"
-                : "scripted"
-            : wanted;
+          wanted === "auto" ? (geminiAvailable() ? "gemini" : "scripted") : wanted;
 
-        const reachable =
-          resolved === "gemini"
-            ? geminiAvailable()
-            : resolved === "claude"
-              ? claudeAvailable()
-              : true;
+        // Asking for the model without a key says so and falls back, rather than
+        // quietly running something else and letting the label do the lying.
+        const reachable = resolved === "gemini" ? geminiAvailable() : true;
 
         if (!reachable) {
           emit({
             type: "note",
             tone: "warn",
             text:
-              resolved === "gemini"
-                ? "GEMINI_API_KEY is not set, so the Gemini buyer cannot run. Falling back to the scripted one."
-                : "No Anthropic credentials are set, so the Claude buyer cannot run. Falling back to the scripted one.",
+              "GEMINI_API_KEY is not set, so the buyer cannot run as a model. " +
+              "Falling back to the scripted one.",
           });
         }
 
@@ -114,7 +98,6 @@ export async function POST(request: Request) {
         };
 
         if (reachable && resolved === "gemini") await runGemini(args);
-        else if (reachable && resolved === "claude") await runClaude(args);
         else await runScripted(args);
       } catch (err) {
         // A run that dies mid-way still has to say so on the wire, or the console sits

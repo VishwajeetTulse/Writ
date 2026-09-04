@@ -27,8 +27,8 @@ import { REASON_LABELS, type ReasonCode, type Verdict } from "./policy";
  * Neither is written by a model. Every decision already carries its own arithmetic,
  * because the engine records evidence rather than prose, so this is rendering rather
  * than reasoning. A model asked to do it could only introduce the possibility of saying
- * something the numbers do not support. When `ANTHROPIC_API_KEY` is set a model may
- * rephrase `text`; it never touches the facts, and `source` says which you are reading.
+ * something the numbers do not support, so nothing here calls one. `source` records that,
+ * and exists so a future model-written variant could never be mistaken for this one.
  */
 
 export interface ExplanationFact {

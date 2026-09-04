@@ -22,9 +22,9 @@ import type { RunEvent } from "./events";
  * Second, a demo that cannot fail. This path needs no model, no API key and no tokens,
  * so it runs the same on a conference network at 9am as it does here.
  *
- * The two model drivers, `gemini.ts` and `claude.ts`, run real tool loops over the same
- * gateway and emit the same events. The console does not change; it only relabels which
- * buyer ran. Anything they share lives in `buyer.ts`.
+ * The model driver, `gemini.ts`, runs a real tool loop over the same gateway and emits
+ * the same events. The console does not change; it only relabels which buyer ran.
+ * Everything the two share lives in `buyer.ts`.
  */
 
 interface Ctx {

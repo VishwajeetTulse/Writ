@@ -121,33 +121,30 @@ function DecisionExplanation({
   );
 }
 
-type Driver = "gemini" | "claude" | "scripted";
+type Driver = "gemini" | "scripted";
 
 /**
  * What the buyer pane says it is running.
  *
- * `ran` distinguishes a driver that has actually started from one merely selected in
- * the dropdown — the server picks, and the screen should report rather than predict.
+ * Read off the run's own `run_started` event rather than guessed from configuration:
+ * the server picks the driver, and a run with no key falls back to the scripted buyer.
+ * The screen reports what happened.
  */
 function label(driver: Driver, geminiModel: string, ran: boolean): string {
-  const name =
-    driver === "gemini" ? geminiModel : driver === "claude" ? "claude-opus-5" : "scripted";
+  const name = driver === "gemini" ? geminiModel : "scripted";
   if (!ran) return name;
   return driver === "scripted" ? "scripted · no model" : `${name} · real model`;
 }
 
 export function RunConsole({
   mandates,
-  claudeReady,
   geminiReady,
   geminiModel,
 }: {
   mandates: RunMandate[];
-  /** Whether Anthropic credentials are configured on the server. */
-  claudeReady: boolean;
   /** Whether a Gemini key is configured on the server. */
   geminiReady: boolean;
-  /** Which Gemini model a run would use, so the picker can name it. */
+  /** Which model a run would use, so the pane can name it before one starts. */
   geminiModel: string;
 }) {
   const active = mandates.filter((m) => m.status === "ACTIVE");
@@ -158,9 +155,7 @@ export function RunConsole({
   );
   /** Off by default: an agent that already knows the limits proves nothing. */
   const [briefed, setBriefed] = useState(false);
-  const [driver, setDriver] = useState<Driver>(
-    geminiReady ? "gemini" : claudeReady ? "claude" : "scripted",
-  );
+  const driver: Driver = geminiReady ? "gemini" : "scripted";
   /** Which driver the server actually ran, from run_started. Never assumed. */
   const [ranAs, setRanAs] = useState<Driver | null>(null);
   const [chaos, setChaos] = useState(false);
@@ -348,7 +343,7 @@ export function RunConsole({
     <div className="space-y-8">
       {/* ------------------------------------------------------------- controls */}
       <div className="border-b border-line pb-6">
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,230px)_minmax(0,160px)_minmax(0,1fr)_auto] lg:items-end">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,260px)_minmax(0,1fr)_auto] lg:items-end">
           <div>
             <label htmlFor="run-mandate" className="eyebrow mb-2 block">
               Mandate
@@ -365,27 +360,6 @@ export function RunConsole({
                   {m.id} · {m.status}
                 </option>
               ))}
-            </select>
-          </div>
-
-          <div>
-            <label htmlFor="run-driver" className="eyebrow mb-2 block">
-              Buyer
-            </label>
-            <select
-              id="run-driver"
-              value={driver}
-              onChange={(e) => setDriver(e.target.value as Driver)}
-              disabled={running}
-              className={`${controlClass} h-[34px]`}
-            >
-              <option value="gemini" disabled={!geminiReady}>
-                Gemini{geminiReady ? "" : " (no key set)"}
-              </option>
-              <option value="claude" disabled={!claudeReady}>
-                Claude{claudeReady ? "" : " (no key set)"}
-              </option>
-              <option value="scripted">Scripted</option>
             </select>
           </div>
 
