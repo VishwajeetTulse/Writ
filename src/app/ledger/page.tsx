@@ -28,7 +28,7 @@ const COLUMNS = [
   { label: "Amount", align: "right" },
   { label: "Took", align: "right" },
   { label: "", align: "right" },
-  { label: "Chain", align: "left" },
+  { label: "Hash", align: "left" },
 ] as const;
 
 /**
@@ -79,7 +79,6 @@ export default async function LedgerPage({ searchParams }: PageProps<"/ledger">)
       reasonCode: e.reasonCode,
       amount: e.amountPaise !== null ? formatPaise(e.amountPaise) : null,
       latency: e.latencyUs !== null ? `${(e.latencyUs / 1000).toFixed(2)}ms` : null,
-      prevHash: e.prevHash,
       hash: e.hash,
       detail: productName ?? note,
       extraViolations: Math.max(violations.length - 1, 0),
@@ -150,7 +149,7 @@ export default async function LedgerPage({ searchParams }: PageProps<"/ledger">)
         />
       ) : (
         <Scroller>
-          <table className="w-full min-w-[980px] border-collapse text-left">
+          <table className="w-full min-w-[900px] border-collapse text-left">
             <thead>
               <tr className="border-y border-line bg-sunk">
                 {COLUMNS.map((c, i) => (

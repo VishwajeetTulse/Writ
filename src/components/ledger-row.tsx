@@ -28,7 +28,6 @@ export interface LedgerRowData {
   reasonCode: string | null;
   amount: string | null;
   latency: string | null;
-  prevHash: string;
   hash: string;
   detail: string | null;
   extraViolations: number;
@@ -135,17 +134,14 @@ export function LedgerRow({ row }: { row: LedgerRowData }) {
             </button>
           )}
         </td>
+        {/* Rows run newest first and each one commits to the row below it, so this
+            column is the chain. A row's prevHash is by definition the hash on the next
+            line down, and printing both put the same value on screen twice. */}
         <td
-          className={`${cell} whitespace-nowrap pr-4 font-mono text-nano text-ink-soft`}
-          title={`previous ${row.prevHash}\nthis     ${row.hash}`}
+          className={`${cell} whitespace-nowrap pr-4 font-mono text-nano text-ink`}
+          title={row.hash}
         >
-          {row.prevHash.slice(0, 4)}…{row.prevHash.slice(-3)}
-          <span aria-hidden className="mx-1 text-line-strong">
-            →
-          </span>
-          <span className="text-ink">
-            {row.hash.slice(0, 4)}…{row.hash.slice(-3)}
-          </span>
+          {row.hash.slice(0, 8)}…{row.hash.slice(-4)}
         </td>
       </tr>
 
