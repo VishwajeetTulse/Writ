@@ -6,7 +6,15 @@ import { evaluate, type MandateContext, type ProposedAction } from "@/lib/policy
 import type { MandateMerchant, MandateTerms } from "@/lib/mandate";
 import { formatPaise } from "@/lib/money";
 import { Runway } from "@/components/runway";
-import { Button, Chip, controlClass, inputClass, Panel, Scroller } from "@/components/ui";
+import {
+  Button,
+  Chip,
+  controlBase,
+  controlClass,
+  inputClass,
+  Panel,
+  Scroller,
+} from "@/components/ui";
 
 /**
  * Issuing a mandate.
@@ -350,14 +358,14 @@ export function MandateForm({
           </label>
 
           {velocityOn && (
-            <div className="mt-3.5 flex items-center gap-2 text-ui">
+            <div className="mt-3.5 flex w-fit items-center gap-2 text-ui">
               <input
                 type="number"
                 min={1}
                 value={velocityMax}
                 aria-label="Purchases allowed"
                 onChange={(e) => setVelocityMax(Math.max(Number(e.target.value), 1))}
-                className={`${controlClass} h-[34px] w-14 shrink-0 px-1 text-center font-mono tnum`}
+                className={`${controlBase} h-[34px] w-14 shrink-0 px-1 text-center font-mono tnum`}
               />
               <span className="shrink-0 whitespace-nowrap text-ink-mute">
                 purchases every
@@ -368,13 +376,13 @@ export function MandateForm({
                 value={windowCount}
                 aria-label="Length of the window"
                 onChange={(e) => setWindowCount(Math.max(Number(e.target.value), 1))}
-                className={`${controlClass} h-[34px] w-14 shrink-0 px-1 text-center font-mono tnum`}
+                className={`${controlBase} h-[34px] w-14 shrink-0 px-1 text-center font-mono tnum`}
               />
               <select
                 value={windowUnit}
                 aria-label="Unit of the window"
                 onChange={(e) => setWindowUnit(e.target.value as UnitKey)}
-                className={`${controlClass} h-[34px] w-auto min-w-0 shrink px-1.5`}
+                className={`${controlBase} h-[34px] w-[104px] shrink-0 px-2`}
               >
                 <option value="minute">{windowCount === 1 ? "minute" : "minutes"}</option>
                 <option value="hour">{windowCount === 1 ? "hour" : "hours"}</option>

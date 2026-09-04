@@ -337,10 +337,21 @@ export function Button({
  * global `:focus-visible` rule in globals.css, so keyboard users get a real target and
  * mouse users do not get a box drawn round every field they click.
  */
-export const controlClass =
-  "w-full rounded-sm border border-line bg-surface px-2.5 text-ui text-ink " +
+/**
+ * Everything about a control except its width.
+ *
+ * `controlClass` bakes in `w-full`, which silently fights any width a caller adds
+ * beside it — Tailwind resolves conflicting utilities by their order in the stylesheet,
+ * not by the order they appear in the class string, so `w-14` next to `w-full` wins or
+ * loses unpredictably. Reach for this when the control needs a width of its own.
+ */
+export const controlBase =
+  "rounded-sm border border-line bg-surface px-2.5 text-ui text-ink " +
   "outline-none transition-colors placeholder:text-ink-soft " +
   "hover:border-line-strong focus:border-ink-mute disabled:bg-sunk disabled:opacity-60";
+
+/** A control that fills its container. The common case. */
+export const controlClass = `${controlBase} w-full`;
 
 export const inputClass = `${controlClass} h-[34px]`;
 

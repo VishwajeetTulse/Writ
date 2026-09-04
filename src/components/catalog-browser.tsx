@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { formatPaise } from "@/lib/money";
-import { controlClass, Empty, inputClass, linkClass } from "@/components/ui";
+import { controlBase, Empty, inputClass, linkClass } from "@/components/ui";
 import type { Coverage } from "@/lib/catalog-coverage";
 
 /**
@@ -113,7 +113,7 @@ export function CatalogBrowser({
           value={merchantId}
           onChange={(e) => setMerchantId(e.target.value)}
           aria-label="Filter by shop"
-          className={`${controlClass} h-[34px] w-auto`}
+          className={`${controlBase} h-[34px] w-auto`}
         >
           <option value="">All shops</option>
           {merchants.map((m) => (
@@ -127,7 +127,7 @@ export function CatalogBrowser({
           value={category}
           onChange={(e) => setCategory(e.target.value)}
           aria-label="Filter by kind of item"
-          className={`${controlClass} h-[34px] w-auto`}
+          className={`${controlBase} h-[34px] w-auto`}
         >
           <option value="">All kinds</option>
           {categories.map((c) => (
