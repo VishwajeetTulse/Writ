@@ -233,6 +233,16 @@ export default async function MandateDetailPage({ params }: PageProps<"/mandates
                         {p.status}
                       </span>
                       <span className="truncate">{p.razorpayOrderId ?? "no order"}</span>
+                      {p.status === "CREATED" && p.razorpayOrderId && (
+                        // An operator affordance, kept out of the agent's way. See
+                        // /settle for why this is not on the run console.
+                        <Link
+                          href={`/settle/${p.id}`}
+                          className={`shrink-0 text-ink ${linkClass}`}
+                        >
+                          settle
+                        </Link>
+                      )}
                       <span className="ml-auto shrink-0">{relativeTime(p.createdAt)}</span>
                     </div>
                   </li>

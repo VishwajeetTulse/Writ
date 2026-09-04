@@ -127,6 +127,7 @@ Anthropic key.
 | A mandate is a real UPI Autopay mandate | `npm run autopay:probe` | Compiles the signed terms into a token and creates the authorisation order |
 | The whole gated path works | `npm run gate2` | 10 assertions end to end, real orders |
 | Webhooks cannot be forged | `npm run webhook:test` | Rejects unsigned, wrong-signature and tampered bodies |
+| A purchase can really be paid | `/settle/<purchase>`, then `npm run reconcile` | Razorpay checkout against a gateway-created order; a real capture, settled by pulling Razorpay's own status |
 | The ledger has not drifted from Razorpay | `npm run reconcile` | Two passes: did anything settle without us hearing, and does Razorpay confirm everything we call settled |
 | Revocation lands on the next call | `npm run revoke:test` | Revokes mid-run, asserts the next attempt is refused |
 | The audit trail was not edited | `curl 'localhost:3000/api/ledger?verify=1'` | Rehashes the entire chain |
@@ -363,6 +364,14 @@ Stated plainly, because a security claim with unstated boundaries is worth nothi
   Writ implements the first layer for real and does not implement the second. An allowed
   purchase creates a genuine Razorpay order, which is a server-side authorisation to
   collect; settling it needs an instrument, and provisioning one is out of scope here.
+
+  Because that gap is easy to assert and hard to believe, `/settle/<purchase>` stands in
+  for the instrument once, by hand: it opens Razorpay's own checkout against an order the
+  gateway created, and paying it produces a real test-mode capture with a real payment id
+  that shows up in the Razorpay dashboard. `npm run reconcile` then settles the ledger by
+  asking Razorpay what happened rather than trusting the browser that just said so. The
+  screen is deliberately unreachable from the run console — an agent waiting on a human
+  at a checkout is the thing this product removes.
 
   In production the two compose, and the composition is the whole point: the human
   registers a pre-authorised instrument once — a UPI Autopay or e-mandate debit — at the
