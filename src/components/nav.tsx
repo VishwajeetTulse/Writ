@@ -83,12 +83,6 @@ export function Nav({
         </nav>
 
         <div className="ml-auto flex shrink-0 items-center gap-3 self-center">
-          <span
-            title="No live keys are configured. Nothing here can move real money."
-            className="hidden rounded-xs border border-line px-1.5 py-0.5 font-mono text-nano uppercase tracking-[0.07em] text-ink-soft lg:inline"
-          >
-            test mode
-          </span>
 
           {user && (
             <>

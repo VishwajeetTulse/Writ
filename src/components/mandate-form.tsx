@@ -4,7 +4,6 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { evaluate, type MandateContext, type ProposedAction } from "@/lib/policy";
 import type { MandateMerchant, MandateTerms } from "@/lib/mandate";
-import { formatPaise } from "@/lib/money";
 import { Runway } from "@/components/runway";
 import {
   Button,
@@ -13,7 +12,6 @@ import {
   controlClass,
   inputClass,
   Panel,
-  Scroller,
 } from "@/components/ui";
 
 /**
@@ -449,67 +447,6 @@ export function MandateForm({
             </div>
           </div>
 
-          <Scroller bleed={false} className="max-h-[400px] overflow-y-auto border-t border-hairline">
-            <table className="w-full border-collapse text-left">
-              <caption className="sr-only">
-                Every product in the catalog, with the verdict these terms would reach.
-              </caption>
-              <tbody>
-                {preview.rows
-                  .slice()
-                  .sort((a, b) => b.product.pricePaise - a.product.pricePaise)
-                  .map(({ product, decision }) => {
-                    const allowed = decision.verdict === "ALLOW";
-                    return (
-                      <tr
-                        key={product.sku}
-                        className="border-b border-hairline last:border-0"
-                      >
-                        <td className="w-1 py-2 pl-4">
-                          <span
-                            aria-hidden
-                            className={`block h-4 w-[3px] rounded-xs ${
-                              allowed ? "bg-permit" : "bg-deny"
-                            }`}
-                          />
-                        </td>
-                        <td className="max-w-0 py-2 pl-2.5 pr-2">
-                          <div className="truncate text-ui">{product.name}</div>
-                          <div className="truncate font-mono text-nano text-ink-soft">
-                            {product.merchantName} · {product.category}
-                          </div>
-                        </td>
-                        <td className="whitespace-nowrap py-2 pr-2 text-right font-mono text-micro tnum">
-                          {formatPaise(BigInt(product.pricePaise))}
-                        </td>
-                        <td className="whitespace-nowrap py-2 pr-4 text-right">
-                          {allowed ? (
-                            <span className="font-mono text-nano uppercase tracking-[0.07em] text-permit">
-                              allow
-                            </span>
-                          ) : (
-                            <span
-                              className="font-mono text-nano text-deny"
-                              title={decision.violations
-                                .map((v) => v.reasonCode)
-                                .join(", ")}
-                            >
-                              {decision.reasonCode}
-                              {decision.violations.length > 1 && (
-                                <span className="text-ink-soft">
-                                  {" "}
-                                  +{decision.violations.length - 1}
-                                </span>
-                              )}
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-              </tbody>
-            </table>
-          </Scroller>
         </Panel>
 
       </div>

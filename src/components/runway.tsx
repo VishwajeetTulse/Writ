@@ -110,28 +110,34 @@ export function Runway({
       </div>
 
       {!compact && (
-        <div className="relative mt-2 h-7">
-          <span className="absolute left-0 font-mono text-nano tnum text-ink-soft">
-            {formatPaiseCompact(BigInt(Math.round(remaining)))} left
-          </span>
-
-          <span
-            className="absolute -translate-x-1/2 whitespace-nowrap text-center font-mono text-nano tnum"
-            style={{ left: `${WALL_PCT}%` }}
-          >
-            <span className="block font-medium">
-              {formatPaiseCompact(BigInt(Math.round(capPaise)))}
+        <>
+          {/* The cap label is pinned to the wall, so the other two cannot be pinned to
+              the edges as well — at panel widths they run straight into it. Left label
+              only, and anything about the refused attempt goes on its own line. */}
+          <div className="relative mt-2 h-7">
+            <span className="absolute left-0 max-w-[30%] truncate font-mono text-nano tnum text-ink-soft">
+              {formatPaiseCompact(BigInt(Math.round(remaining)))} left
             </span>
-            <span className="eyebrow mt-1 block">hard cap</span>
-          </span>
+
+            <span
+              className="absolute -translate-x-1/2 whitespace-nowrap text-center font-mono text-nano tnum"
+              style={{ left: `${WALL_PCT}%` }}
+            >
+              <span className="block font-medium">
+                {formatPaiseCompact(BigInt(Math.round(capPaise)))}
+              </span>
+              <span className="eyebrow mt-1 block">hard cap</span>
+            </span>
+          </div>
 
           {breach && breach.overshoots && (
-            <span className="absolute right-0 max-w-[36%] truncate text-right font-mono text-nano tnum text-deny">
+            <p className="mt-1 truncate text-right font-mono text-nano tnum text-deny">
               {blockedLabel ?? "refused"}
-            </span>
+            </p>
           )}
-        </div>
+        </>
       )}
+
     </div>
   );
 }
