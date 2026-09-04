@@ -2,6 +2,7 @@ import Link from "next/link";
 import { listMandates } from "@/lib/mandate-service";
 import { requireUser } from "@/lib/session";
 import { RunConsole } from "@/components/run-console";
+import { claudeAvailable } from "@/lib/agent/claude";
 import { buttonClass, Empty, Page } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
@@ -38,6 +39,7 @@ export default async function RunPage() {
         </Empty>
       ) : (
         <RunConsole
+          claudeReady={claudeAvailable()}
           mandates={mandates.map((m) => ({
             id: m.id,
             intentText: m.intentText,

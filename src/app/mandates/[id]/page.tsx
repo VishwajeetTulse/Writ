@@ -13,6 +13,7 @@ import {
 import { Runway } from "@/components/runway";
 import { SignatureSeal, StatusPill } from "@/components/verdict";
 import { plainReason } from "@/lib/explain";
+import { toAutopayToken, unmappedBounds } from "@/lib/razorpay/autopay";
 import { RevokeButton } from "@/components/revoke-button";
 import { Field, linkClass, Page, Section, Stack, Stat } from "@/components/ui";
 import { requireUser } from "@/lib/session";
@@ -36,6 +37,10 @@ export default async function MandateDetailPage({ params }: PageProps<"/mandates
 
   const { row, terms, status, signatureValid, purchases, refusals } = detail;
   const velocity = velocityLabel(terms.velocityMax, terms.velocityWindowS);
+
+  // What this mandate looks like to the payment rail, and what the rail cannot hold.
+  const token = toAutopayToken(terms);
+  const unmapped = unmappedBounds(terms);
 
   // The most recent refusal drives the runway's breach marker: the bar then shows both
   // the spending that was permitted and the specific attempt that was not.
@@ -153,6 +158,50 @@ export default async function MandateDetailPage({ params }: PageProps<"/mandates
               </div>
             </div>
           </div>
+        </Section>
+
+        <Section
+          title="On the rail"
+          aside={
+            <span className="font-mono text-nano uppercase tracking-[0.07em] text-ink-soft">
+              upi autopay
+            </span>
+          }
+        >
+          <p className="human mb-6 max-w-[68ch] text-lede leading-[1.55] text-ink-mute">
+            UPI Autopay mandates carry a per-debit ceiling, an expiry and a rate. So does
+            this one, and the three values below are the ones Razorpay would be handed.
+            The rest of the terms have no equivalent on the rail, which is why the policy
+            engine has to enforce them here.
+          </p>
+
+          <div className="grid grid-cols-2 gap-x-6 gap-y-6 sm:grid-cols-3">
+            <Field label="token.max_amount">{token.max_amount} paise</Field>
+            <Field label="token.expire_at">{token.expire_at}</Field>
+            <Field label="token.frequency">{token.frequency}</Field>
+          </div>
+
+          <div className="mt-7 border-t border-hairline pt-6">
+            <div className="eyebrow mb-3">Enforced by Writ, not by UPI</div>
+            <ul className="divide-y divide-hairline border-b border-hairline">
+              {unmapped.map((b) => (
+                <li key={b.bound} className="flex flex-wrap items-baseline gap-x-3 py-2.5">
+                  <span className="w-32 shrink-0 text-ui">{b.bound}</span>
+                  <span className="font-mono text-micro tnum">{b.value}</span>
+                  <span className="w-full text-small text-ink-soft sm:ml-auto sm:w-auto sm:max-w-[52ch] sm:text-right">
+                    {b.why}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <p className="mt-4 text-small leading-relaxed text-ink-soft">
+            Not wired end to end. Creating the authorisation order is a real call and{" "}
+            <span className="font-mono">npm run autopay:probe</span> makes it. Completing
+            the mandate needs a one-time approval in a UPI app, and charging against it
+            needs Recurring Payments enabled on the Razorpay account.
+          </p>
         </Section>
 
         <div className="grid gap-11 lg:grid-cols-2">

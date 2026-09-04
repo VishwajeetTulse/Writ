@@ -226,3 +226,87 @@ export async function createPaymentLink(params: {
     },
   });
 }
+
+// ---------------------------------------------------------------------------
+// UPI Autopay authorisation
+//
+// The two calls below are how a Writ mandate reaches the rail as a UPI Autopay
+// mandate. They live here because this file is the only place that holds Razorpay
+// credentials; the mapping itself is pure and lives in `autopay.ts`.
+//
+// How far this goes, precisely: creating the customer and the authorisation order are
+// real API calls that work with ordinary test keys. What follows them does not, and is
+// not faked anywhere in this codebase. Completing the mandate needs the customer to
+// approve it once in a UPI app, and charging against the resulting token afterwards
+// needs Recurring Payments enabled on the account, which Razorpay grants on request.
+// `npm run autopay:probe` runs these calls and prints whatever Razorpay actually says.
+// ---------------------------------------------------------------------------
+
+export interface RazorpayCustomer {
+  id: string;
+  name?: string;
+  contact?: string;
+  email?: string;
+}
+
+export async function createCustomer(params: {
+  name: string;
+  contact: string;
+  email: string;
+  notes?: Record<string, string>;
+}): Promise<RazorpayCustomer> {
+  return request<RazorpayCustomer>({
+    method: "POST",
+    path: "/customers",
+    body: {
+      name: params.name,
+      contact: params.contact,
+      email: params.email,
+      // Razorpay wants this as a string. With it set, a repeat of the same person
+      // returns the existing customer instead of a 400 — which is what its own
+      // guidance asks for, since one person should have one customer id.
+      fail_existing: "0",
+      notes: params.notes,
+    },
+  });
+}
+
+/** The conventional UPI mandate authorisation charge: ₹1, refunded once registered. */
+export const AUTOPAY_AUTH_PAISE = 100n;
+
+/**
+ * The authorisation order for a UPI Autopay mandate.
+ *
+ * `amount` is what the one-time authorisation transaction charges, not what the mandate
+ * permits — that is `token.max_amount`. Razorpay rejects a zero-amount order, so this
+ * defaults to the conventional ₹1 registration charge rather than to nothing.
+ */
+export async function createAutopayAuthorizationOrder(params: {
+  customerId: string;
+  token: { max_amount: number; expire_at: number; frequency: string };
+  receipt: string;
+  amountPaise?: bigint;
+  notes?: Record<string, string>;
+}): Promise<RazorpayOrder> {
+  return request<RazorpayOrder>({
+    method: "POST",
+    path: "/orders",
+    body: {
+      amount: Number(params.amountPaise ?? AUTOPAY_AUTH_PAISE),
+      currency: "INR",
+      method: "upi",
+      customer_id: params.customerId,
+      receipt: params.receipt,
+      token: params.token,
+      notes: params.notes,
+    },
+  });
+}
+
+/** Existing customers, newest first. Used to recover an id a previous run created. */
+export async function fetchCustomers(count = 20): Promise<{ items: RazorpayCustomer[] }> {
+  return request<{ items: RazorpayCustomer[] }>({
+    method: "GET",
+    path: `/customers?count=${count}`,
+  });
+}

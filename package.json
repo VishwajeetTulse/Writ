@@ -18,7 +18,8 @@
     "webhook:test": "tsx scripts/test-webhook.ts",
     "reconcile": "tsx scripts/reconcile.ts",
     "revoke:test": "tsx scripts/test-revocation.ts",
-    "evals": "tsx evals/run.ts"
+    "evals": "tsx evals/run.ts",
+    "autopay:probe": "tsx scripts/autopay-probe.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",

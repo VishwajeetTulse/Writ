@@ -121,10 +121,22 @@ function DecisionExplanation({
   );
 }
 
-export function RunConsole({ mandates }: { mandates: RunMandate[] }) {
+export function RunConsole({
+  mandates,
+  claudeReady,
+}: {
+  mandates: RunMandate[];
+  /** Whether an Anthropic key is configured on the server. */
+  claudeReady: boolean;
+}) {
   const active = mandates.filter((m) => m.status === "ACTIVE");
   const [mandateId, setMandateId] = useState(active[0]?.id ?? mandates[0]?.id ?? "");
   const [goal, setGoal] = useState("Restock the weekly essentials.");
+  const [driver, setDriver] = useState<"claude" | "scripted">(
+    claudeReady ? "claude" : "scripted",
+  );
+  /** Which driver the server actually ran, from run_started. Never assumed. */
+  const [ranAs, setRanAs] = useState<"claude" | "scripted" | null>(null);
   const [chaos, setChaos] = useState(false);
   const [pauseForRevocation, setPauseForRevocation] = useState(false);
   const [revoking, setRevoking] = useState(false);
@@ -170,6 +182,7 @@ export function RunConsole({ mandates }: { mandates: RunMandate[] }) {
     setAttempts([]);
     setEnded(null);
     setRunId(null);
+    setRanAs(null);
     setRevoked(false);
     setSpend({ spent: selected?.spentPaise ?? 0, cap: selected?.totalCapPaise ?? 0 });
 
@@ -184,6 +197,7 @@ export function RunConsole({ mandates }: { mandates: RunMandate[] }) {
           goal,
           chaos: chaos ? "razorpay_timeout" : null,
           pauseForRevocation,
+          driver,
         }),
       });
 
@@ -253,6 +267,7 @@ export function RunConsole({ mandates }: { mandates: RunMandate[] }) {
     switch (event.type) {
       case "run_started":
         setRunId(event.runId);
+        setRanAs(event.driver);
         break;
 
       case "plan":
@@ -306,7 +321,7 @@ export function RunConsole({ mandates }: { mandates: RunMandate[] }) {
     <div className="space-y-8">
       {/* ------------------------------------------------------------- controls */}
       <div className="border-b border-line pb-6">
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,260px)_minmax(0,1fr)_auto] lg:items-end">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,230px)_minmax(0,160px)_minmax(0,1fr)_auto] lg:items-end">
           <div>
             <label htmlFor="run-mandate" className="eyebrow mb-2 block">
               Mandate
@@ -323,6 +338,24 @@ export function RunConsole({ mandates }: { mandates: RunMandate[] }) {
                   {m.id} · {m.status}
                 </option>
               ))}
+            </select>
+          </div>
+
+          <div>
+            <label htmlFor="run-driver" className="eyebrow mb-2 block">
+              Buyer
+            </label>
+            <select
+              id="run-driver"
+              value={driver}
+              onChange={(e) => setDriver(e.target.value as "claude" | "scripted")}
+              disabled={running}
+              className={`${controlClass} h-[34px]`}
+            >
+              <option value="claude" disabled={!claudeReady}>
+                Claude{claudeReady ? "" : " (no key set)"}
+              </option>
+              <option value="scripted">Scripted</option>
             </select>
           </div>
 
@@ -420,7 +453,13 @@ export function RunConsole({ mandates }: { mandates: RunMandate[] }) {
             title="Buyer"
             aside={
               <span className="font-mono text-nano uppercase tracking-[0.07em] text-ink-soft">
-                scripted · no model
+                {ranAs === "claude"
+                  ? "claude-opus-5 · real model"
+                  : ranAs === "scripted"
+                    ? "scripted · no model"
+                    : driver === "claude"
+                      ? "claude-opus-5"
+                      : "scripted"}
               </span>
             }
           />
@@ -428,7 +467,8 @@ export function RunConsole({ mandates }: { mandates: RunMandate[] }) {
           <div ref={leftRef} className="flex-1 space-y-3.5 overflow-y-auto px-4 py-4">
             {narration.length === 0 && (
               <p className="human px-2 pt-14 text-center text-lede leading-relaxed text-ink-soft">
-                What the buyer decides to do appears here. None of it is trusted.
+                What the buyer decides to do appears here, in its own words. None of it
+                is trusted.
               </p>
             )}
             {narration.map((n) => (

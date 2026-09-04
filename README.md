@@ -43,14 +43,13 @@ reads the credentials, so there is no path to a live charge that skips it.
 
 ### The 90-second version
 
-1. **Activity**, press Run. A buyer shops against a mandate. Four purchases go
-   through and create real Razorpay test orders.
-2. It then reaches a television whose product description tells AI shopping assistants
-   that the mandate has been upgraded and limits no longer apply. The buyer believes it.
-   The purchase is refused in under a millisecond, breaking four bounds at once.
-3. It retries an earlier purchase with the same idempotency key. Refused before
-   Razorpay is called.
-4. Tick **Pause so I can revoke**, run again, and press **Revoke** while it is running.
+1. **Activity**, pick a buyer and press Run. It shops against a mandate; the purchases
+   that clear create real Razorpay test orders.
+2. It reaches a television whose description tells AI shopping assistants that the
+   mandate has been upgraded and limits no longer apply. Whether or not the buyer acts
+   on it, the purchase is refused in under a millisecond, breaking four bounds at once.
+3. A purchase retried with the same idempotency key is refused before Razorpay is called.
+4. Tick **Hold mid-run**, run again, and press **Withdraw now** while it is working.
    The next attempt is refused and the run ends halted.
 5. **Ledger**, press **Verify chain**. Every row is rehashed from the first one forward.
 
@@ -123,8 +122,9 @@ Anthropic key.
 | Claim | Command | What it proves |
 |---|---|---|
 | The bounds hold across 111 cases | `npm run evals` | Block recall, allow accuracy, per-cause recall, latency |
-| The engine behaves at its edges | `npm test` | 67 unit tests over the pure function |
+| The engine behaves at its edges | `npm test` | 93 unit tests over the pure functions |
 | Razorpay is really wired up | `npm run smoke:razorpay` | Creates a real test-mode order |
+| A mandate is a real UPI Autopay mandate | `npm run autopay:probe` | Compiles the signed terms into a token and creates the authorisation order |
 | The whole gated path works | `npm run gate2` | 10 assertions end to end, real orders |
 | Webhooks cannot be forged | `npm run webhook:test` | Rejects unsigned, wrong-signature and tampered bodies |
 | Settlement survives a dropped webhook | `npm run reconcile` | Pulls status from Razorpay and compares amounts |
@@ -177,16 +177,55 @@ boundary is drawn at the HTTP route rather than by a network — see
 
 ---
 
+## On the rail
+
+Razorpay's UPI Autopay authorisation carries this:
+
+```json
+"token": { "max_amount": 200000, "expire_at": 2709971120, "frequency": "monthly" }
+```
+
+A per-debit ceiling, an expiry, and a rate. That is a mandate, and it is the same object
+Writ signs. The primitive was not invented here — NPCI shipped it and Razorpay exposes
+it. What is missing is that an AI buyer needs bounds finer than the rail can express.
+
+| Writ's term | UPI Autopay | Who enforces it |
+|---|---|---|
+| `perTxnCapPaise` | `token.max_amount` | The rail |
+| `expiresAt` | `token.expire_at` | The rail |
+| velocity | `token.frequency` | Lossy — UPI's values are calendar-shaped |
+| `totalCapPaise` | nothing | Writ |
+| merchant allowlist | nothing | Writ |
+| category allowlist | nothing | Writ |
+
+The three that do not map are the reason the policy engine exists. UPI can cap one debit
+and expire a mandate; it cannot say "at most ₹2,000 in total, only at these two shops,
+only for groceries". So Writ enforces the whole set before a purchase reaches the rail
+and hands the rail the two bounds it understands. Every mandate screen shows both halves
+of that table for its own terms.
+
+`npm run autopay:probe` takes a real signed mandate to the real endpoint and prints
+whatever comes back. It creates the customer and the UPI authorisation order for real,
+with test keys. **It stops there, and nothing further is faked anywhere in this
+codebase.** Completing the mandate needs a one-time approval in a UPI app, and charging
+against the resulting token needs Recurring Payments enabled on the Razorpay account,
+which is granted on request rather than by default.
+
+---
+
 ## Where the model is, and is not
 
 | Uses an LLM | Does not |
 |---|---|
-| Drafting a mandate from a sentence, then clamped by server-side ceilings and reviewed by a human before signing | The policy engine |
-| The buyer agent, which chooses what to shop for | The gateway |
+| The buyer agent, which decides what to shop for and puts each purchase to the gateway | The policy engine |
+| | The gateway |
 | | Pricing |
 | | Signature verification |
 | | Explaining a verdict |
 | | The audit ledger |
+
+Exactly one thing in this product is a model, and it is the thing being enforced
+against. Everything that decides whether money may move is deterministic code.
 
 Explaining a verdict started out on the left of that table and moved right, which is
 worth a sentence. Every decision already carries its own arithmetic, because the engine
@@ -196,15 +235,31 @@ something the numbers do not support. So `/api/explain` builds the sentence from
 recorded evidence and the interface shows the reason code beside it. A model may later
 rephrase it, and the response says which version you are reading.
 
-The buyer pane in the console currently runs a **scripted buyer**, and says so on
-screen. That is deliberate rather than a placeholder apology. The claim Writ makes is
-that money actions are bounded regardless of what the buyer does, so substituting a
-script and getting identical verdicts is the strongest available statement of it: the
-enforcement does not depend on the thing being enforced against. It also means the demo
-needs no key, no tokens and no network beyond Razorpay.
+There are two buyers, and the console lets you pick.
 
-With `ANTHROPIC_API_KEY` set, a Claude tool loop drives the same gateway calls and emits
-the same event stream. The console does not change.
+**Claude** (`src/lib/agent/claude.ts`) is a real tool loop on `claude-opus-5` with three
+tools: search the catalog, read a product, attempt a purchase. It needs
+`ANTHROPIC_API_KEY`. The model is told the mandate's terms so it can plan sensibly and
+is trusted with none of them — `attempt_purchase` takes a SKU and a quantity, and the
+gateway prices the SKU itself. It may also pass a `claimed_amount_paise`, which is
+recorded and then ignored; when it disagrees with the catalog, the console says so.
+
+**Scripted** (`src/lib/agent/scripted.ts`) is a fixed sequence that needs no key, no
+tokens and no network beyond Razorpay. It exists because a demo on a conference network
+should not depend on a third API being up, and because it makes the point sharper:
+substituting a script and getting identical verdicts is the strongest available
+statement that enforcement does not depend on the thing being enforced against.
+
+Both emit the same events and both are judged by the same gateway. The buyer pane
+labels whichever one actually ran, read off the run's own `run_started` event rather
+than off the dropdown.
+
+`read_product` hands the model the merchant's description verbatim, prompt injection and
+all, because merchant-controlled text is the real attacker's channel into an AI buyer.
+**The demo does not depend on the model falling for it.** If Claude reads the injected
+listing and declines, that is a good outcome and the run says so; if it complies, the
+gateway refuses in under a millisecond. Both endings support the same claim, which is
+the reason the claim does not rest on the model's behaviour.
 
 ---
 
@@ -246,6 +301,42 @@ policy engine draws. Full notes at the top of `src/app/globals.css`.
 | `POST /api/webhooks/razorpay` | Settlement. Signature checked on raw bytes before parsing |
 
 All money is integer paise in `bigint`. There is no float anywhere in the money path.
+
+---
+
+## What broke
+
+Four that were worth the time they cost.
+
+**The evaluation suite found a real bug on its first run.** A mandate that had lapsed
+reported `SIGNATURE_INVALID` rather than `MANDATE_EXPIRED` — the right verdict for the
+wrong reason, which is the kind of defect that survives a demo and fails an audit. It
+happened because an expired mandate fell through to a generic "not active" gate. The 66
+unit tests that existed at the time all missed it: they exercised the clock path, and
+never the stored-status path that `loadMandate` actually produces. Fixed by gating
+expiry before that branch, with a regression test on the path the tests had skipped.
+
+**The policy engine crashed in the browser.** It timed itself with
+`process.hrtime.bigint()`, which does not exist outside Node, so the live preview on the
+New mandate screen died the first time anyone typed in it. The README at that point
+claimed the engine "runs identically on either side of the wire", and it had never once
+run on the other side. Fixed with a clock that picks `performance.now()` when there is no
+process, and by deleting the sentence until it was true.
+
+**An hour lost to a dev server that was never restarting.** Google sign-in kept failing
+with a Prisma adapter error saying `account.findUnique` was undefined, which pointed
+squarely at the database. The client was fine. `pkill -f "next dev"` does nothing on
+Windows, so every restart had been a no-op, port 3000 was still held by the original
+process, and Turbopack was serving a chunk compiled before the auth models existed.
+Fixed by killing the listener by PID and clearing `.next`. The lasting fix was to the
+sign-in page, which now prints the actual Auth.js error code instead of "something went
+wrong" — the word `Configuration` would have pointed at the server in the first minute.
+
+**Razorpay rejected the UPI authorisation order.** A mandate grants future authority
+without collecting anything, so the order was created for zero, and the API returned
+`Order amount less than minimum amount allowed`. ₹1 is the conventional mandate
+registration charge, refunded once registered. The mistake was assuming the shape of a
+call instead of making it.
 
 ---
 
@@ -301,6 +392,9 @@ Stated plainly, because a security claim with unstated boundaries is worth nothi
   order it settles are real, created by the gateway against Razorpay's test API. Only
   the delivery of the notification is simulated.
 - **The buyer is scripted unless an Anthropic key is set.** See above.
+- **You cannot write a mandate in a sentence.** The form takes shops, categories
+  and numbers directly. Drafting terms from natural language and clamping them
+  against server-side ceilings is the obvious next thing to build, and is not built.
 
 One product description in the seed contains a prompt-injection payload. That is
 deliberate. It is the adversarial case the engine is measured against, and it is
@@ -311,7 +405,7 @@ documented in `prisma/seed.ts`.
 ## Stack
 
 Next.js 16 (App Router, Turbopack) · React 19 · Tailwind v4 · Prisma 7 on SQLite ·
-Vitest · Razorpay test-mode REST · Anthropic SDK, optional.
+Vitest · Razorpay test-mode REST · Anthropic SDK for the buyer agent, optional.
 
 Fonts are Instrument Sans and IBM Plex Mono, and the split is load-bearing: anything
 the machine computed is set in mono, anything a person wrote is sans. A reader can tell
