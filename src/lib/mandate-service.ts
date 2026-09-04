@@ -10,6 +10,7 @@ import {
 } from "./mandate";
 import { append } from "./ledger";
 import type { SpendState } from "./policy";
+import type { ActiveMandate } from "./catalog-coverage";
 import type { MandateModel } from "@/generated/prisma/models";
 
 /**
@@ -351,4 +352,50 @@ export async function getMandateDetail(id: string, userId: string) {
     purchaseCount: summary?.purchaseCount ?? 0,
     blockCount: summary?.blockCount ?? 0,
   };
+}
+
+/**
+ * Every mandate of this user's that could authorise a purchase right now, with the
+ * spend already recorded against it.
+ *
+ * Two queries regardless of how many mandates there are, because this page renders
+ * before anyone has decided to buy anything and should not cost more than the screen
+ * that follows it.
+ */
+export async function activeMandatesFor(userId: string): Promise<ActiveMandate[]> {
+  const rows = await prisma.mandate.findMany({ where: { userId, status: "ACTIVE" } });
+
+  // A mandate whose expiry has passed is not active, whatever its row still says.
+  const live = rows.filter((row) => effectiveStatus(row) === "ACTIVE");
+  if (live.length === 0) return [];
+
+  const purchases = await prisma.purchase.findMany({
+    where: {
+      mandateId: { in: live.map((r) => r.id) },
+      status: { in: ["CREATED", "PAID"] },
+    },
+    select: { mandateId: true, amountPaise: true, createdAt: true },
+  });
+
+  return live.map((row) => {
+    const mine = purchases.filter((p) => p.mandateId === row.id);
+    const terms = rowToTerms(row);
+
+    return {
+      id: row.id,
+      intentText: row.intentText,
+      merchantIds: terms.merchants.map((m) => m.id),
+      context: {
+        terms,
+        status: row.status as MandateStatus,
+        signatureValid: verifySignature(terms, row.signature),
+      },
+      spend: {
+        spentPaise: mine.reduce((sum, p) => sum + p.amountPaise, 0n),
+        recentPurchaseTimes: mine.map((p) => p.createdAt),
+        // Nothing is being bought here, so no key has been spent.
+        idempotencyKeyUsed: false,
+      },
+    };
+  });
 }

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { formatPaise } from "@/lib/money";
+import type { Coverage } from "@/lib/catalog-coverage";
 
 /**
  * The catalog browser.
@@ -11,13 +12,6 @@ import { formatPaise } from "@/lib/money";
  * worse. If this ever holds a real merchant's inventory, the filters move to the
  * query in `searchCatalog` and this component takes a page of results instead.
  */
-
-export type Coverage =
-  | { kind: "covered"; mandateId: string; mandateIntent: string }
-  | { kind: "over_cap"; capPaise: number }
-  | { kind: "over_budget"; remainingPaise: number }
-  | { kind: "uncovered" }
-  | { kind: "unknown" };
 
 export interface CatalogProductView {
   sku: string;
@@ -228,36 +222,31 @@ function MerchantCard({
 }
 
 /**
- * What this item means for the person's own mandates.
- *
- * These read off the mandate's own numbers. The binding answer still comes from the
- * policy engine at the moment of purchase, which also weighs the rate limit and
- * whatever else has been spent since this page rendered.
+ * What this item means for the person's own mandates, as decided by the policy engine
+ * on the server. Nothing is re-judged here — this only renders the answer.
  */
 function CoverageNote({ coverage }: { coverage: Coverage }) {
-  switch (coverage.kind) {
-    case "covered":
-      return (
-        <div className="mt-1 text-[12px] text-permit" title={coverage.mandateIntent}>
-          Covered
-        </div>
-      );
-    case "over_cap":
-      return (
-        <div className="mt-1 text-[12px] text-deny">
-          Over your {formatPaise(BigInt(coverage.capPaise), { showPaise: false })} limit
-        </div>
-      );
-    case "over_budget":
-      return (
-        <div className="mt-1 text-[12px] text-hold">
-          More than the{" "}
-          {formatPaise(BigInt(coverage.remainingPaise), { showPaise: false })} left
-        </div>
-      );
-    case "uncovered":
-      return <div className="mt-1 text-[12px] text-ink-mute">Not in a mandate</div>;
-    default:
-      return null;
+  if (coverage.kind === "covered") {
+    return (
+      <div className="mt-1 text-[12px] text-permit" title={coverage.mandateIntent}>
+        Covered
+      </div>
+    );
   }
+
+  if (coverage.kind === "refused") {
+    // Out of scope is a quieter fact than a limit being hit. Only the second one is
+    // something the person might want to go and change.
+    const scope =
+      coverage.reasonCode === "MERCHANT_NOT_ALLOWED" ||
+      coverage.reasonCode === "CATEGORY_NOT_ALLOWED";
+
+    return (
+      <div className={`mt-1 text-[12px] ${scope ? "text-ink-mute" : "text-deny"}`}>
+        {coverage.note}
+      </div>
+    );
+  }
+
+  return null;
 }

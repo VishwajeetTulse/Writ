@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-03T18:15:20.553Z",
+  "generatedAt": "2026-09-04T07:04:02.696Z",
   "engine": "src/lib/policy.ts :: evaluate",
   "note": "Scored against the pure policy function, with no database, network or model in the path. Every case fixes its own clock, so this is reproducible.",
   "totals": {
@@ -17,9 +17,9 @@
     "allowAccuracy": 1
   },
   "latencyUs": {
-    "p50": 3,
-    "p95": 13,
-    "max": 39
+    "p50": 2,
+    "p95": 12,
+    "max": 43
   },
   "byGroup": [
     {
@@ -154,7 +154,7 @@
       "actual": "ALLOW",
       "actualReason": null,
       "actualViolations": [],
-      "latencyUs": 39,
+      "latencyUs": 43,
       "passed": true
     },
     {
@@ -166,7 +166,7 @@
       "actual": "ALLOW",
       "actualReason": null,
       "actualViolations": [],
-      "latencyUs": 9,
+      "latencyUs": 12,
       "passed": true
     },
     {
@@ -178,7 +178,7 @@
       "actual": "ALLOW",
       "actualReason": null,
       "actualViolations": [],
-      "latencyUs": 8,
+      "latencyUs": 10,
       "passed": true
     },
     {
@@ -238,7 +238,7 @@
       "actual": "ALLOW",
       "actualReason": null,
       "actualViolations": [],
-      "latencyUs": 4,
+      "latencyUs": 5,
       "passed": true
     },
     {
@@ -444,7 +444,7 @@
       "actualViolations": [
         "PER_TXN_CAP_EXCEEDED"
       ],
-      "latencyUs": 24,
+      "latencyUs": 28,
       "passed": true
     },
     {
@@ -500,7 +500,7 @@
       "actualViolations": [
         "PER_TXN_CAP_EXCEEDED"
       ],
-      "latencyUs": 3,
+      "latencyUs": 7,
       "passed": true
     },
     {
@@ -514,7 +514,7 @@
       "actualViolations": [
         "PER_TXN_CAP_EXCEEDED"
       ],
-      "latencyUs": 3,
+      "latencyUs": 6,
       "passed": true
     },
     {
@@ -542,7 +542,7 @@
       "actualViolations": [
         "PER_TXN_CAP_EXCEEDED"
       ],
-      "latencyUs": 3,
+      "latencyUs": 2,
       "passed": true
     },
     {
@@ -570,7 +570,7 @@
       "actualViolations": [
         "PER_TXN_CAP_EXCEEDED"
       ],
-      "latencyUs": 4,
+      "latencyUs": 3,
       "passed": true
     },
     {
@@ -582,7 +582,7 @@
       "actual": "ALLOW",
       "actualReason": null,
       "actualViolations": [],
-      "latencyUs": 2,
+      "latencyUs": 3,
       "passed": true
     },
     {
@@ -656,7 +656,7 @@
       "actual": "ALLOW",
       "actualReason": null,
       "actualViolations": [],
-      "latencyUs": 6,
+      "latencyUs": 2,
       "passed": true
     },
     {
@@ -776,7 +776,7 @@
       "actualViolations": [
         "TOTAL_CAP_EXCEEDED"
       ],
-      "latencyUs": 2,
+      "latencyUs": 3,
       "passed": true
     },
     {
@@ -854,7 +854,7 @@
       "actual": "ALLOW",
       "actualReason": null,
       "actualViolations": [],
-      "latencyUs": 10,
+      "latencyUs": 12,
       "passed": true
     },
     {
@@ -918,7 +918,7 @@
       "actualViolations": [
         "VELOCITY_EXCEEDED"
       ],
-      "latencyUs": 3,
+      "latencyUs": 4,
       "passed": true
     },
     {
@@ -1022,7 +1022,7 @@
       "actualViolations": [
         "MANDATE_EXPIRED"
       ],
-      "latencyUs": 23,
+      "latencyUs": 25,
       "passed": true
     },
     {
@@ -1064,7 +1064,7 @@
       "actualViolations": [
         "MERCHANT_NOT_ALLOWED"
       ],
-      "latencyUs": 15,
+      "latencyUs": 18,
       "passed": true
     },
     {
@@ -1092,7 +1092,7 @@
       "actualViolations": [
         "MERCHANT_NOT_ALLOWED"
       ],
-      "latencyUs": 3,
+      "latencyUs": 2,
       "passed": true
     },
     {
@@ -1120,7 +1120,7 @@
       "actualViolations": [
         "CATEGORY_NOT_ALLOWED"
       ],
-      "latencyUs": 7,
+      "latencyUs": 6,
       "passed": true
     },
     {
@@ -1134,7 +1134,7 @@
       "actualViolations": [
         "CATEGORY_NOT_ALLOWED"
       ],
-      "latencyUs": 4,
+      "latencyUs": 3,
       "passed": true
     },
     {
@@ -1162,7 +1162,7 @@
       "actualViolations": [
         "MERCHANT_NOT_ALLOWED"
       ],
-      "latencyUs": 15,
+      "latencyUs": 4,
       "passed": true
     },
     {
@@ -1190,7 +1190,7 @@
       "actualViolations": [
         "MANDATE_REVOKED"
       ],
-      "latencyUs": 3,
+      "latencyUs": 4,
       "passed": true
     },
     {
@@ -1260,7 +1260,7 @@
       "actualViolations": [
         "MANDATE_REVOKED"
       ],
-      "latencyUs": 6,
+      "latencyUs": 5,
       "passed": true
     },
     {
@@ -1288,7 +1288,7 @@
       "actualViolations": [
         "QUANTITY_INVALID"
       ],
-      "latencyUs": 2,
+      "latencyUs": 3,
       "passed": true
     },
     {
@@ -1302,7 +1302,7 @@
       "actualViolations": [
         "QUANTITY_INVALID"
       ],
-      "latencyUs": 3,
+      "latencyUs": 2,
       "passed": true
     },
     {
@@ -1372,7 +1372,7 @@
       "actualViolations": [
         "QUANTITY_INVALID"
       ],
-      "latencyUs": 1,
+      "latencyUs": 2,
       "passed": true
     },
     {
@@ -1415,7 +1415,7 @@
         "MERCHANT_NOT_ALLOWED",
         "DUPLICATE_REQUEST"
       ],
-      "latencyUs": 11,
+      "latencyUs": 12,
       "passed": true
     },
     {
@@ -1509,7 +1509,7 @@
         "VELOCITY_EXCEEDED",
         "DUPLICATE_REQUEST"
       ],
-      "latencyUs": 4,
+      "latencyUs": 3,
       "passed": true
     },
     {
