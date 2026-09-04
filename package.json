@@ -19,12 +19,14 @@
     "reconcile": "tsx scripts/reconcile.ts",
     "revoke:test": "tsx scripts/test-revocation.ts",
     "evals": "tsx evals/run.ts",
-    "autopay:probe": "tsx scripts/autopay-probe.ts"
+    "autopay:probe": "tsx scripts/autopay-probe.ts",
+    "gemini:models": "tsx scripts/gemini-models.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",
     "@anthropic-ai/vertex-sdk": "^0.19.6",
     "@auth/prisma-adapter": "^2.11.3",
+    "@google/genai": "^2.21.0",
     "@prisma/adapter-better-sqlite3": "^7.10.0",
     "@prisma/client": "^7.10.0",
     "next": "16.3.4",

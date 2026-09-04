@@ -1,5 +1,6 @@
 import { runScripted } from "@/lib/agent/scripted";
 import { claudeAvailable, runClaude } from "@/lib/agent/claude";
+import { geminiAvailable, runGemini } from "@/lib/agent/gemini";
 import { sse, type RunEvent } from "@/lib/agent/events";
 import { isChaosMode } from "@/lib/razorpay/chaos";
 import { requireApiUser } from "@/lib/session";
@@ -31,8 +32,10 @@ export async function POST(request: Request) {
     goal?: string;
     chaos?: string | null;
     pauseForRevocation?: boolean;
-    /** "auto" prefers Claude when a key is configured. */
-    driver?: "auto" | "claude" | "scripted";
+    /** Tell the buyer its limits. Off by default; see buyer.ts. */
+    briefed?: boolean;
+    /** "auto" prefers whichever model is configured, Gemini first. */
+    driver?: "auto" | "gemini" | "claude" | "scripted";
   };
   try {
     body = (await request.json()) as typeof body;
@@ -69,18 +72,35 @@ export async function POST(request: Request) {
 
       try {
         const wanted = body.driver ?? "auto";
-        const useClaude =
-          wanted === "claude" || (wanted === "auto" && claudeAvailable());
 
-        if (useClaude && !claudeAvailable()) {
-          // Asked for the model and there is no key. Say so rather than quietly
-          // running something else and letting the label do the lying.
+        // "auto" picks whatever is actually reachable, preferring Gemini because that is
+        // the key this project is configured with. Asking for a driver whose credentials
+        // are missing says so and falls back, rather than quietly running something else
+        // and letting the label do the lying.
+        const resolved =
+          wanted === "auto"
+            ? geminiAvailable()
+              ? "gemini"
+              : claudeAvailable()
+                ? "claude"
+                : "scripted"
+            : wanted;
+
+        const reachable =
+          resolved === "gemini"
+            ? geminiAvailable()
+            : resolved === "claude"
+              ? claudeAvailable()
+              : true;
+
+        if (!reachable) {
           emit({
             type: "note",
             tone: "warn",
             text:
-              "ANTHROPIC_API_KEY is not set, so the Claude buyer cannot run. " +
-              "Falling back to the scripted one.",
+              resolved === "gemini"
+                ? "GEMINI_API_KEY is not set, so the Gemini buyer cannot run. Falling back to the scripted one."
+                : "No Anthropic credentials are set, so the Claude buyer cannot run. Falling back to the scripted one.",
           });
         }
 
@@ -89,14 +109,13 @@ export async function POST(request: Request) {
           goal,
           chaos,
           pauseForRevocation: body.pauseForRevocation === true,
+          briefed: body.briefed === true,
           emit,
         };
 
-        if (useClaude && claudeAvailable()) {
-          await runClaude(args);
-        } else {
-          await runScripted(args);
-        }
+        if (reachable && resolved === "gemini") await runGemini(args);
+        else if (reachable && resolved === "claude") await runClaude(args);
+        else await runScripted(args);
       } catch (err) {
         // A run that dies mid-way still has to say so on the wire, or the console sits
         // there looking like it is thinking.

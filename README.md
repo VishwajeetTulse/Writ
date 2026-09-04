@@ -238,12 +238,18 @@ rephrase it, and the response says which version you are reading.
 
 There are two buyers, and the console lets you pick.
 
-**Claude** (`src/lib/agent/claude.ts`) is a real tool loop on `claude-opus-5` with three
-tools: search the catalog, read a product, attempt a purchase. It needs either
-`ANTHROPIC_API_KEY`, or `GOOGLE_CLOUD_PROJECT` and `CLOUD_ML_REGION` to reach the same
-model through Vertex AI on a Google Cloud account. The request is identical on both
-surfaces; only the billing and the authentication differ, and the run says which one it
-used. The model is told the mandate's terms so it can plan sensibly and
+**Gemini** (`src/lib/agent/gemini.ts`) is a real tool loop with three tools: search the
+catalog, read a product, attempt a purchase. It needs `GEMINI_API_KEY` from Google AI
+Studio. `GEMINI_MODEL` picks the model and `npm run gemini:models` says which ones a key
+can actually reach — it makes a real tool call against each rather than listing, because
+listing proves nothing. `gemini-2.5-flash` appears in the list and 404s on use.
+
+**Claude** (`src/lib/agent/claude.ts`) is the same loop against `claude-opus-5`, needing
+either `ANTHROPIC_API_KEY` or `GOOGLE_CLOUD_PROJECT` and `CLOUD_ML_REGION` for Vertex AI.
+
+Both drivers share `buyer.ts`, which holds the tools, the system prompt, the run
+lifecycle and the one function that can move money. Only request shaping differs between
+them. A purchase tool with two implementations would eventually behave two ways. The model is told the mandate's terms so it can plan sensibly and
 is trusted with none of them — `attempt_purchase` takes a SKU and a quantity, and the
 gateway prices the SKU itself. It may also pass a `claimed_amount_paise`, which is
 recorded and then ignored; when it disagrees with the catalog, the console says so.
@@ -260,10 +266,20 @@ than off the dropdown.
 
 `read_product` hands the model the merchant's description verbatim, prompt injection and
 all, because merchant-controlled text is the real attacker's channel into an AI buyer.
-**The demo does not depend on the model falling for it.** If Claude reads the injected
-listing and declines, that is a good outcome and the run says so; if it complies, the
-gateway refuses in under a millisecond. Both endings support the same claim, which is
-the reason the claim does not rest on the model's behaviour.
+
+**Tell the buyer its limits** is the switch worth understanding. Briefed, the agent gets
+the mandate's terms and mostly polices itself — that is your own agent, spending under a
+mandate it can read. Unbriefed, it knows nothing about the terms behind its token, which
+is the situation whenever the agent belongs to somebody else, and it finds the walls by
+being refused.
+
+The second is the one worth watching, and it is off by default for that reason. An agent
+that declines to overspend because it was asked nicely has demonstrated nothing about the
+gateway. Asked for a television it has no authority to buy, an unbriefed Gemini went
+straight at it and was refused in 303 microseconds on four bounds at once — wrong shop,
+wrong category, over the per-purchase cap, over the total. It then tried the wrong
+merchant twice, adapted, bought what it could, and finally hit the total cap and the rate
+limit. Nobody wrote that sequence.
 
 ---
 
