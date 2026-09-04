@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { Explanation } from "@/lib/explain";
 import { VerdictPill } from "@/components/verdict";
+import { buttonClass } from "@/components/ui";
 import type { Verdict } from "@/lib/policy";
 
 /**
@@ -13,10 +14,9 @@ import type { Verdict } from "@/lib/policy";
  * thing that satisfies "every money action is explainable", and a UI that quietly
  * bypasses it would leave the claim resting on a code path nobody exercises.
  *
- * The panel shows the sentence and the numbers behind it. Nothing else: the reason
- * code is already in its own column, and an explanation of how the check works is not
- * something the person reading this came here for. `/api/explain` still returns the
- * mechanism for anyone integrating against it.
+ * The sentence is set in the serif and the numbers behind it in mono, which is the
+ * product's rule everywhere: the explanation is addressed to a reader, the evidence
+ * under it was computed.
  */
 
 export interface LedgerRowData {
@@ -34,12 +34,13 @@ export interface LedgerRowData {
   extraViolations: number;
 }
 
+/** Who acted. The two that decide things are inked; the rest recede. */
 const ACTOR_TONE: Record<string, string> = {
   agent: "text-ink",
   policy: "text-ink",
   human: "text-ink",
-  razorpay: "text-ink-mute",
-  system: "text-ink-mute",
+  razorpay: "text-ink-soft",
+  system: "text-ink-soft",
 };
 
 export function LedgerRow({ row }: { row: LedgerRowData }) {
@@ -65,72 +66,83 @@ export function LedgerRow({ row }: { row: LedgerRowData }) {
     try {
       const res = await fetch(`/api/explain?seq=${row.seq}`);
       if (!res.ok) {
-        setError("Could not explain this row.");
+        setError("This row could not be explained. It may have been filtered out.");
         return;
       }
       setExplanation((await res.json()) as Explanation);
     } catch {
-      setError("Could not reach the server.");
+      setError("Could not reach the server. Check the connection and try again.");
     } finally {
       setLoading(false);
     }
   }
 
+  const cell = "px-3 py-2 align-top";
+
   return (
     <>
-      <tr className="border-b border-line/70 align-top hover:bg-ground/60">
-        <td className="whitespace-nowrap px-3 py-2.5 pl-5 font-mono text-[11px] tnum text-ink-mute">
+      <tr
+        className={`border-b border-hairline transition-colors ${
+          open ? "bg-surface" : "hover:bg-surface"
+        }`}
+      >
+        <td className={`${cell} whitespace-nowrap pl-4 font-mono text-micro tnum text-ink-soft`}>
           {row.seq}
         </td>
-        <td className="whitespace-nowrap px-3 py-2.5 font-mono text-[11px] tnum text-ink-mute">
+        <td className={`${cell} whitespace-nowrap font-mono text-micro tnum text-ink-mute`}>
           {row.time}
         </td>
         <td
-          className={`whitespace-nowrap px-3 py-2.5 font-mono text-[11px] ${
-            ACTOR_TONE[row.actor] ?? "text-ink-mute"
+          className={`${cell} whitespace-nowrap font-mono text-micro ${
+            ACTOR_TONE[row.actor] ?? "text-ink-soft"
           }`}
         >
           {row.actor}
         </td>
-        <td className="whitespace-nowrap px-3 py-2.5 font-mono text-[11px]">{row.type}</td>
-        <td className="px-3 py-2.5">
+        <td className={`${cell} whitespace-nowrap font-mono text-micro`}>{row.type}</td>
+        <td className={cell}>
           {row.verdict ? <VerdictPill verdict={row.verdict as Verdict} /> : null}
         </td>
-        <td className="max-w-[300px] px-3 py-2.5">
+        <td className={`${cell} max-w-[280px]`}>
           {row.reasonCode && (
-            <div className="font-mono text-[11px] font-medium">{row.reasonCode}</div>
+            <div className="font-mono text-micro font-medium">{row.reasonCode}</div>
           )}
           {row.extraViolations > 0 && (
-            <div className="font-mono text-[10px] text-deny">
-              + {row.extraViolations} more bound{row.extraViolations === 1 ? "" : "s"} broken
+            <div className="font-mono text-nano text-deny">
+              +{row.extraViolations} more bound{row.extraViolations === 1 ? "" : "s"} broken
             </div>
           )}
           {row.detail && (
-            <div className="truncate text-[12px] text-ink-mute">{row.detail}</div>
+            <div className="truncate text-small text-ink-mute">{row.detail}</div>
           )}
         </td>
-        <td className="whitespace-nowrap px-3 py-2.5 text-right font-mono text-[11px] tnum">
+        <td className={`${cell} whitespace-nowrap text-right font-mono text-micro tnum`}>
           {row.amount ?? ""}
         </td>
-        <td className="whitespace-nowrap px-3 py-2.5 text-right font-mono text-[11px] tnum text-ink-mute">
+        <td
+          className={`${cell} whitespace-nowrap text-right font-mono text-micro tnum text-ink-soft`}
+        >
           {row.latency ?? ""}
         </td>
-        <td className="whitespace-nowrap px-3 py-2.5 text-right">
+        <td className={`${cell} whitespace-nowrap text-right`}>
           {explainable && (
             <button
               onClick={toggle}
-              className="rounded border border-line px-2 py-1 text-[11px] text-ink-mute transition-colors hover:border-line-strong hover:text-ink"
+              aria-expanded={open}
+              className={buttonClass("secondary", "sm")}
             >
               {open ? "Hide" : "Explain"}
             </button>
           )}
         </td>
         <td
-          className="whitespace-nowrap px-3 py-2.5 pr-5 font-mono text-[10px] text-ink-mute"
-          title={`prev ${row.prevHash}\nthis ${row.hash}`}
+          className={`${cell} whitespace-nowrap pr-4 font-mono text-nano text-ink-soft`}
+          title={`previous ${row.prevHash}\nthis     ${row.hash}`}
         >
           {row.prevHash.slice(0, 4)}…{row.prevHash.slice(-3)}
-          <span className="mx-1 text-line-strong">→</span>
+          <span aria-hidden className="mx-1 text-line-strong">
+            →
+          </span>
           <span className="text-ink">
             {row.hash.slice(0, 4)}…{row.hash.slice(-3)}
           </span>
@@ -138,31 +150,52 @@ export function LedgerRow({ row }: { row: LedgerRowData }) {
       </tr>
 
       {open && (
-        <tr className="border-b border-line/70 bg-ground/50">
-          <td colSpan={10} className="px-5 py-4">
-            {loading && <p className="text-[13px] text-ink-mute">Reading the evidence…</p>}
-            {error && <p className="text-[13px] text-deny">{error}</p>}
+        <tr className="border-b border-hairline bg-sunk">
+          <td colSpan={10} className="px-4 py-4">
+            {loading && <ExplanationSkeleton />}
+
+            {error && <p className="text-ui text-deny">{error}</p>}
 
             {explanation && (
-              <div className="max-w-[92ch]">
-                <p className="text-[15px] leading-relaxed">{explanation.text}</p>
+              <div className="max-w-[88ch]">
+                <p className="human text-lede leading-[1.6]">{explanation.text}</p>
 
                 {explanation.facts.length > 0 && (
-                  <div className="mt-3.5 flex flex-wrap gap-x-6 gap-y-2">
+                  <div className="mt-4 flex flex-wrap gap-x-8 gap-y-3">
                     {explanation.facts.map((f) => (
                       <div key={f.label}>
                         <div className="eyebrow">{f.label}</div>
-                        <div className="mt-0.5 font-mono text-[12px] tnum">{f.value}</div>
+                        <div className="mt-1 font-mono text-small tnum">{f.value}</div>
                       </div>
                     ))}
                   </div>
                 )}
-
               </div>
             )}
           </td>
         </tr>
       )}
     </>
+  );
+}
+
+/**
+ * The shape of the answer, held while it loads.
+ *
+ * A skeleton rather than a spinner: the row is about to fill with a sentence and a set
+ * of figures, and showing that shape means the layout does not jump when it arrives.
+ */
+function ExplanationSkeleton() {
+  return (
+    <div className="max-w-[88ch] animate-pulse" aria-live="polite" aria-busy="true">
+      <span className="sr-only">Reading the evidence.</span>
+      <div className="h-4 w-[72%] rounded-xs bg-line" />
+      <div className="mt-2 h-4 w-[46%] rounded-xs bg-line" />
+      <div className="mt-5 flex gap-8">
+        <div className="h-6 w-24 rounded-xs bg-line/70" />
+        <div className="h-6 w-24 rounded-xs bg-line/70" />
+        <div className="h-6 w-20 rounded-xs bg-line/70" />
+      </div>
+    </div>
   );
 }

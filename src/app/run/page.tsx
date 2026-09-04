@@ -2,7 +2,7 @@ import Link from "next/link";
 import { listMandates } from "@/lib/mandate-service";
 import { requireUser } from "@/lib/session";
 import { RunConsole } from "@/components/run-console";
-import { Empty, Page } from "@/components/ui";
+import { buttonClass, Empty, Page } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -20,16 +20,21 @@ export default async function RunPage() {
   return (
     <Page
       wide
+      kicker="Live"
       title="Activity"
       lede="Watch an agent shop against a mandate. Every purchase it proposes is judged before any money is committed."
     >
       {mandates.length === 0 ? (
-        <Empty>
-          No mandates to run against.{" "}
-          <Link href="/mandates/new" className="text-ink underline underline-offset-2">
-            Issue one first
-          </Link>
-          .
+        <Empty
+          title="There is nothing for an agent to run against."
+          action={
+            <Link href="/mandates/new" className={buttonClass("primary", "md")}>
+              Write a mandate
+            </Link>
+          }
+        >
+          An agent needs a mandate before it can propose a single purchase. Write one and
+          come back here to watch it work.
         </Empty>
       ) : (
         <RunConsole

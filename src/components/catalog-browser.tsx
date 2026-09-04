@@ -2,10 +2,15 @@
 
 import { useMemo, useState } from "react";
 import { formatPaise } from "@/lib/money";
+import { controlClass, Empty, inputClass, linkClass } from "@/components/ui";
 import type { Coverage } from "@/lib/catalog-coverage";
 
 /**
  * The catalog browser.
+ *
+ * Laid out as a catalogue rather than a grid of product cards: each shop is a heading
+ * with its stock listed beneath it. A card per product would give seventeen equally
+ * weighted boxes and no way to see which shop you were in.
  *
  * Filtering happens in the browser rather than as a round trip, because the whole
  * catalog is seventeen items and a server hop for a keystroke would be slower and
@@ -86,20 +91,29 @@ export function CatalogBrowser({
   const shown = filtered.reduce((n, m) => n + m.products.length, 0);
   const narrowed = shown !== total;
 
+  function clear() {
+    setQuery("");
+    setCategory("");
+    setMerchantId("");
+    setCoveredOnly(false);
+  }
+
   return (
     <div>
-      <div className="mb-4 flex flex-wrap items-center gap-2">
+      <div className="mb-5 flex flex-wrap items-center gap-2 border-b border-line pb-4">
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search items"
-          className="h-9 min-w-[200px] flex-1 rounded-md border border-line bg-surface px-3 text-[13px] outline-none placeholder:text-ink-mute focus:border-line-strong"
+          aria-label="Search items"
+          className={`${inputClass} min-w-[180px] max-w-[280px] flex-1`}
         />
 
         <select
           value={merchantId}
           onChange={(e) => setMerchantId(e.target.value)}
-          className="h-9 rounded-md border border-line bg-surface px-2.5 text-[13px] outline-none focus:border-line-strong"
+          aria-label="Filter by shop"
+          className={`${controlClass} h-[34px] w-auto`}
         >
           <option value="">All shops</option>
           {merchants.map((m) => (
@@ -112,7 +126,8 @@ export function CatalogBrowser({
         <select
           value={category}
           onChange={(e) => setCategory(e.target.value)}
-          className="h-9 rounded-md border border-line bg-surface px-2.5 text-[13px] outline-none focus:border-line-strong"
+          aria-label="Filter by kind of item"
+          className={`${controlClass} h-[34px] w-auto`}
         >
           <option value="">All kinds</option>
           {categories.map((c) => (
@@ -123,7 +138,7 @@ export function CatalogBrowser({
         </select>
 
         {signedIn && hasMandates && (
-          <label className="flex h-9 shrink-0 cursor-pointer items-center gap-2 rounded-md border border-line bg-surface px-3 text-[13px] text-ink-mute">
+          <label className="flex h-[34px] shrink-0 cursor-pointer items-center gap-2 rounded-sm border border-line bg-surface px-3 text-ui text-ink-mute transition-colors hover:border-line-strong">
             <input
               type="checkbox"
               checked={coveredOnly}
@@ -133,22 +148,29 @@ export function CatalogBrowser({
             Only what a mandate covers
           </label>
         )}
+
+        <span className="ml-auto font-mono text-micro tnum text-ink-soft">
+          {narrowed ? `${shown} of ${total} items` : `${total} items · ${merchants.length} shops`}
+        </span>
       </div>
 
-      <p className="mb-4 font-mono text-[11px] tnum text-ink-mute">
-        {narrowed
-          ? `${shown} of ${total} items`
-          : `${total} items across ${merchants.length} shops`}
-      </p>
-
       {filtered.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-line-strong bg-surface px-6 py-12 text-center text-[13px] text-ink-mute">
-          Nothing matches that.
-        </div>
+        <Empty
+          title="Nothing in the catalog matches that."
+          action={
+            <button onClick={clear} className={`text-ui text-ink ${linkClass}`}>
+              Clear the filters
+            </button>
+          }
+        >
+          {coveredOnly
+            ? "You are only showing items one of your mandates covers. Turn that off to see the rest of the shelf."
+            : "Try a shorter search, or a different shop."}
+        </Empty>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-10">
           {filtered.map((m) => (
-            <MerchantCard key={m.id} merchant={m} signedIn={signedIn} />
+            <MerchantListing key={m.id} merchant={m} signedIn={signedIn} />
           ))}
         </div>
       )}
@@ -156,7 +178,8 @@ export function CatalogBrowser({
   );
 }
 
-function MerchantCard({
+/** One shop and its stock. A heading and a rule, not a box. */
+function MerchantListing({
   merchant,
   signedIn,
 }: {
@@ -164,44 +187,45 @@ function MerchantCard({
   signedIn: boolean;
 }) {
   return (
-    <section className="overflow-hidden rounded-lg border border-line bg-surface">
-      <header className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-line px-5 py-3.5">
-        <h2 className="text-[15px] font-semibold tracking-[-0.01em]">{merchant.name}</h2>
-        <span className="rounded border border-line px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.06em] text-ink-mute">
+    <section>
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-line pb-2.5">
+        <h2 className="human text-title leading-none tracking-[-0.01em]">
+          {merchant.name}
+        </h2>
+        <span className="font-mono text-micro text-ink-soft">{merchant.vpa}</span>
+        <span className="rounded-xs border border-line px-1.5 py-0.5 font-mono text-nano uppercase tracking-[0.07em] text-ink-soft">
           {merchant.category}
         </span>
-        <span className="font-mono text-[11px] text-ink-mute">{merchant.vpa}</span>
 
-        <span className="ml-auto text-[12px] text-ink-mute">
+        <span className="ml-auto text-small text-ink-mute">
           {signedIn
             ? merchant.mandateCount > 0
               ? `Covered by ${merchant.mandateCount} of your mandates`
               : "No mandate of yours covers this shop"
             : `${merchant.products.length} items`}
         </span>
-      </header>
+      </div>
 
-      <ul>
+      <ul className="divide-y divide-hairline border-b border-hairline">
         {merchant.products.map((p) => (
-          <li
-            key={p.sku}
-            className="flex items-start gap-4 border-b border-line px-5 py-3.5 last:border-b-0"
-          >
+          <li key={p.sku} className="flex items-start gap-5 py-3.5">
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
-                <span className="text-[14px]">{p.name}</span>
-                <span className="font-mono text-[11px] text-ink-mute">{p.sku}</span>
+                <span className="text-body">{p.name}</span>
+                <span className="font-mono text-nano text-ink-soft">{p.sku}</span>
                 {!p.inStock && (
-                  <span className="font-mono text-[11px] text-ink-mute">out of stock</span>
+                  <span className="font-mono text-nano uppercase tracking-[0.07em] text-ink-soft">
+                    out of stock
+                  </span>
                 )}
               </div>
 
-              <p className="mt-1 line-clamp-1 max-w-[70ch] text-[12.5px] leading-relaxed text-ink-mute">
+              <p className="mt-1 line-clamp-1 max-w-[76ch] text-small leading-relaxed text-ink-soft">
                 {p.description}
               </p>
 
               {p.addressesAgents && (
-                <p className="mt-1.5 text-[12px] leading-snug text-hold">
+                <p className="mt-2 border-l-2 border-hold/50 pl-2.5 text-small leading-snug text-hold">
                   This description contains instructions aimed at AI agents. Nothing
                   written here can change a limit.
                 </p>
@@ -209,7 +233,7 @@ function MerchantCard({
             </div>
 
             <div className="shrink-0 text-right">
-              <div className="font-mono text-[14px] tnum">
+              <div className="font-mono text-body tnum">
                 {formatPaise(BigInt(p.pricePaise), { showPaise: false })}
               </div>
               <CoverageNote coverage={p.coverage} />
@@ -228,7 +252,7 @@ function MerchantCard({
 function CoverageNote({ coverage }: { coverage: Coverage }) {
   if (coverage.kind === "covered") {
     return (
-      <div className="mt-1 text-[12px] text-permit" title={coverage.mandateIntent}>
+      <div className="mt-1 text-small text-permit" title={coverage.mandateIntent}>
         Covered
       </div>
     );
@@ -242,7 +266,7 @@ function CoverageNote({ coverage }: { coverage: Coverage }) {
       coverage.reasonCode === "CATEGORY_NOT_ALLOWED";
 
     return (
-      <div className={`mt-1 text-[12px] ${scope ? "text-ink-mute" : "text-deny"}`}>
+      <div className={`mt-1 text-small ${scope ? "text-ink-soft" : "text-deny"}`}>
         {coverage.note}
       </div>
     );

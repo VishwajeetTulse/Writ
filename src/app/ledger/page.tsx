@@ -5,7 +5,7 @@ import { formatPaise } from "@/lib/money";
 import { parsePayload, timestamp, violationsFrom } from "@/lib/format";
 import { LedgerRow, type LedgerRowData } from "@/components/ledger-row";
 import { VerifyChain } from "@/components/verify-chain";
-import { Card, Empty, Page } from "@/components/ui";
+import { buttonClass, Empty, Page, Scroller } from "@/components/ui";
 import { requireUser } from "@/lib/session";
 import type { Verdict } from "@/lib/policy";
 
@@ -18,17 +18,32 @@ const FILTERS: Array<{ label: string; params: Record<string, string> }> = [
   { label: "Money moved", params: { type: "ORDER_CREATED" } },
 ];
 
+const COLUMNS = [
+  { label: "Seq", align: "left" },
+  { label: "Time", align: "left" },
+  { label: "Actor", align: "left" },
+  { label: "Event", align: "left" },
+  { label: "Verdict", align: "left" },
+  { label: "Detail", align: "left" },
+  { label: "Amount", align: "right" },
+  { label: "Took", align: "right" },
+  { label: "", align: "right" },
+  { label: "Chain", align: "left" },
+] as const;
+
 /**
  * The audit trail.
  *
- * Track 1 asks you to show one. The distinction this screen has to carry is that a
- * table of rows is not evidence, because anyone can write rows. What makes it evidence
- * is the chain: every row commits to the hash of the row before it, so the trail only
- * verifies if nothing has been edited, reordered or removed since it was written.
+ * A table of rows is not evidence, because anyone can write rows. What makes it
+ * evidence is the chain: every row commits to the hash of the row before it, so the
+ * trail only verifies if nothing has been edited, reordered or removed since it was
+ * written. Hence the chain column, which is otherwise the least interesting thing on
+ * the page, and the Verify button, which recomputes all of it live rather than showing
+ * a number that was true once.
  *
- * Hence the hash column, which is otherwise the least interesting thing on the page,
- * and the Verify button, which recomputes all of it live rather than showing a number
- * that was true once.
+ * The table sits on the page rather than inside a panel, and scrolls sideways inside
+ * its own container. Ten columns of mono at eleven pixels is the densest thing in the
+ * product, and it should look like the instrument it is.
  */
 export default async function LedgerPage({ searchParams }: PageProps<"/ledger">) {
   const user = await requireUser();
@@ -45,6 +60,7 @@ export default async function LedgerPage({ searchParams }: PageProps<"/ledger">)
   ]);
 
   const activeKey = `${verdict ?? ""}|${type ?? ""}`;
+  const filtered = Boolean(mandateId || verdict || type);
 
   // Shaped on the server so the client component receives plain data and no bigints.
   const rows: LedgerRowData[] = events.map((e) => {
@@ -73,11 +89,12 @@ export default async function LedgerPage({ searchParams }: PageProps<"/ledger">)
   return (
     <Page
       wide
-      title="Audit ledger"
+      kicker="Append-only · hash-chained"
+      title="Ledger"
       lede="Every decision made about your money, allowed and stopped alike. Nothing here can be edited after the fact."
       actions={<VerifyChain recordCount={total} />}
     >
-      <div className="mb-4 flex flex-wrap items-center gap-2">
+      <div className="mb-5 flex flex-wrap items-center gap-x-2 gap-y-2 border-b border-line pb-4">
         {FILTERS.map((f) => {
           const params = new URLSearchParams(f.params);
           if (mandateId) params.set("mandate", mandateId);
@@ -88,10 +105,11 @@ export default async function LedgerPage({ searchParams }: PageProps<"/ledger">)
             <Link
               key={f.label}
               href={`/ledger${params.toString() ? `?${params}` : ""}`}
-              className={`rounded-md border px-3 py-1.5 text-[13px] transition-colors ${
+              aria-current={active ? "true" : undefined}
+              className={`rounded-xs border px-2.5 py-1 text-small transition-colors ${
                 active
-                  ? "border-ink bg-ink text-surface"
-                  : "border-line bg-surface text-ink-mute hover:border-line-strong"
+                  ? "border-ink bg-ink font-medium text-surface"
+                  : "border-line bg-surface text-ink-mute hover:border-line-strong hover:text-ink"
               }`}
             >
               {f.label}
@@ -101,46 +119,55 @@ export default async function LedgerPage({ searchParams }: PageProps<"/ledger">)
 
         {mandateId && (
           <Link
-            href="/ledger"
-            className="ml-1 rounded-md border border-line bg-surface px-3 py-1.5 font-mono text-[12px] text-ink-mute hover:border-line-strong"
+            href={`/ledger${verdict || type ? `?${new URLSearchParams({ ...(verdict ? { verdict } : {}), ...(type ? { type } : {}) })}` : ""}`}
+            className="inline-flex items-center gap-1.5 rounded-xs border border-line bg-sunk px-2.5 py-1 font-mono text-micro text-ink-mute transition-colors hover:border-line-strong hover:text-ink"
           >
-            mandate: {mandateId} ×
+            {mandateId}
+            <span aria-hidden>×</span>
+            <span className="sr-only">Clear the mandate filter</span>
           </Link>
         )}
 
-        <span className="ml-auto font-mono text-[11px] tnum text-ink-mute">
+        <span className="ml-auto font-mono text-micro tnum text-ink-soft">
           {events.length} of {total} records
         </span>
       </div>
 
       {events.length === 0 ? (
-        <Empty>Nothing recorded yet under this filter.</Empty>
+        <Empty
+          title={filtered ? "Nothing matches this filter." : "The ledger is empty."}
+          action={
+            filtered ? (
+              <Link href="/ledger" className={buttonClass("secondary", "md")}>
+                Clear filters
+              </Link>
+            ) : (
+              <Link href="/run" className={buttonClass("primary", "md")}>
+                Run an agent
+              </Link>
+            )
+          }
+        >
+          {filtered
+            ? "The records exist, but none of them are of this kind. Widen the filter to see the rest."
+            : "Rows appear here the moment an agent asks to buy something. Nothing is written until a decision is made."}
+        </Empty>
       ) : (
-        <Card pad={false} className="overflow-hidden">
-          <table className="w-full border-collapse text-left">
+        <Scroller>
+          <table className="w-full min-w-[980px] border-collapse text-left">
             <thead>
-              <tr className="border-b border-line">
-                {[
-                  "Seq",
-                  "Time",
-                  "Actor",
-                  "Event",
-                  "Verdict",
-                  "Detail",
-                  "Amount",
-                  "Latency",
-                  "",
-                  "Hash",
-                ].map(
-                  (h) => (
-                    <th
-                      key={h}
-                      className="eyebrow whitespace-nowrap px-3 py-2.5 font-normal first:pl-5 last:pr-5"
-                    >
-                      {h}
-                    </th>
-                  ),
-                )}
+              <tr className="border-y border-line bg-sunk">
+                {COLUMNS.map((c, i) => (
+                  <th
+                    key={c.label || `col${i}`}
+                    scope="col"
+                    className={`eyebrow whitespace-nowrap px-3 py-2 font-normal first:pl-4 last:pr-4 ${
+                      c.align === "right" ? "text-right" : "text-left"
+                    }`}
+                  >
+                    {c.label}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
@@ -149,9 +176,8 @@ export default async function LedgerPage({ searchParams }: PageProps<"/ledger">)
               ))}
             </tbody>
           </table>
-        </Card>
+        </Scroller>
       )}
-
     </Page>
   );
 }

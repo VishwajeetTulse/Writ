@@ -7,7 +7,15 @@ import { formatPaise } from "@/lib/money";
 import { Runway } from "@/components/runway";
 import { VerdictPill } from "@/components/verdict";
 import { explainDecision } from "@/lib/explain";
-import { Card } from "@/components/ui";
+import {
+  Button,
+  buttonClass,
+  controlClass,
+  inputClass,
+  linkClass,
+  Panel,
+  PanelHead,
+} from "@/components/ui";
 
 /**
  * The run console.
@@ -17,6 +25,11 @@ import { Card } from "@/components/ui";
  * Nothing crosses from left to right except a SKU and a quantity; the amount, the
  * merchant, the category and the verdict are all derived on the right from data the
  * left-hand side cannot write.
+ *
+ * The two panes are set in different typefaces, and that is the fastest way to read
+ * this screen. The buyer speaks in the serif, because everything it says is a claim.
+ * The gateway answers in mono, because everything it returns is a computed value. You
+ * can tell which side of the wire you are looking at without reading a word.
  *
  * The runway sits above both because it is the only thing in the room that is true
  * regardless of which pane you believe.
@@ -65,7 +78,8 @@ function DecisionExplanation({
     return (
       <button
         onClick={() => setOpen(true)}
-        className="mt-2 rounded border border-line px-2 py-0.5 text-[11px] text-ink-mute transition-colors hover:border-line-strong hover:text-ink"
+        aria-expanded={false}
+        className={`mt-2.5 ${buttonClass("secondary", "sm")}`}
       >
         Explain
       </button>
@@ -82,15 +96,15 @@ function DecisionExplanation({
   });
 
   return (
-    <div className="mt-2 rounded border border-line bg-ground/70 px-2.5 py-2">
-      <p className="text-[13px] leading-relaxed">{explanation.text}</p>
+    <div className="mt-2.5 rounded-sm border border-hairline bg-sunk px-3 py-2.5">
+      <p className="human text-lede leading-[1.55]">{explanation.text}</p>
 
       {explanation.facts.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5">
+        <div className="mt-2.5 flex flex-wrap gap-x-6 gap-y-2">
           {explanation.facts.map((f) => (
             <div key={f.label}>
               <div className="eyebrow">{f.label}</div>
-              <div className="font-mono text-[11px] tnum">{f.value}</div>
+              <div className="mt-1 font-mono text-micro tnum">{f.value}</div>
             </div>
           ))}
         </div>
@@ -98,7 +112,8 @@ function DecisionExplanation({
 
       <button
         onClick={() => setOpen(false)}
-        className="mt-2 text-[11px] text-ink-mute underline underline-offset-2"
+        aria-expanded
+        className={`mt-2.5 text-micro text-ink-mute ${linkClass}`}
       >
         Hide
       </button>
@@ -241,10 +256,7 @@ export function RunConsole({ mandates }: { mandates: RunMandate[] }) {
         break;
 
       case "plan":
-        setNarration((n) => [
-          ...n,
-          { key: `p${seq}`, kind: "plan", text: event.text },
-        ]);
+        setNarration((n) => [...n, { key: `p${seq}`, kind: "plan", text: event.text }]);
         break;
 
       case "note":
@@ -272,11 +284,7 @@ export function RunConsole({ mandates }: { mandates: RunMandate[] }) {
           const next = [...a];
           for (let i = next.length - 1; i >= 0; i--) {
             if (next[i].sku === event.sku && !next[i].decision) {
-              next[i] = {
-                ...next[i],
-                amountPaise: event.amountPaise,
-                decision: event,
-              };
+              next[i] = { ...next[i], amountPaise: event.amountPaise, decision: event };
               break;
             }
           }
@@ -295,17 +303,20 @@ export function RunConsole({ mandates }: { mandates: RunMandate[] }) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-8">
       {/* ------------------------------------------------------------- controls */}
-      <Card>
+      <div className="border-b border-line pb-6">
         <div className="grid gap-4 lg:grid-cols-[minmax(0,260px)_minmax(0,1fr)_auto] lg:items-end">
-          <label className="block">
-            <span className="eyebrow">Mandate</span>
+          <div>
+            <label htmlFor="run-mandate" className="eyebrow mb-2 block">
+              Mandate
+            </label>
             <select
+              id="run-mandate"
               value={mandateId}
               onChange={(e) => setMandateId(e.target.value)}
               disabled={running}
-              className="mt-1.5 w-full rounded-md border border-line bg-surface px-3 py-2 font-mono text-[13px] outline-none focus:border-ink-mute disabled:opacity-60"
+              className={`${controlClass} h-[34px] font-mono`}
             >
               {mandates.map((m) => (
                 <option key={m.id} value={m.id}>
@@ -313,114 +324,121 @@ export function RunConsole({ mandates }: { mandates: RunMandate[] }) {
                 </option>
               ))}
             </select>
-          </label>
+          </div>
 
-          <label className="block">
-            <span className="eyebrow">Goal given to the buyer</span>
+          <div>
+            <label htmlFor="run-goal" className="eyebrow mb-2 block">
+              What the buyer is asked to do
+            </label>
             <input
+              id="run-goal"
               value={goal}
               onChange={(e) => setGoal(e.target.value)}
               disabled={running}
-              className="mt-1.5 w-full rounded-md border border-line bg-surface px-3 py-2 text-[14px] outline-none focus:border-ink-mute disabled:opacity-60"
+              className={inputClass}
             />
-          </label>
+          </div>
 
-          <div className="flex items-end gap-3">
-            <div className="flex flex-col gap-1.5 pb-1.5">
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={chaos}
-                  onChange={(e) => setChaos(e.target.checked)}
-                  disabled={running}
-                  className="h-3.5 w-3.5 accent-[#b4761a]"
-                />
-                <span className="whitespace-nowrap text-[13px]">
-                  Inject a Razorpay timeout
-                </span>
-              </label>
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={pauseForRevocation}
-                  onChange={(e) => setPauseForRevocation(e.target.checked)}
-                  disabled={running}
-                  className="h-3.5 w-3.5 accent-[#16161a]"
-                />
-                <span className="whitespace-nowrap text-[13px]">
-                  Pause so I can revoke
-                </span>
-              </label>
-            </div>
-
-            <button
+          <div className="flex items-end gap-2">
+            <Button
+              size="lg"
+              variant="primary"
               onClick={run}
               disabled={running || !mandateId}
-              className="rounded-md bg-ink px-5 py-2.5 text-[14px] font-medium text-surface transition-opacity hover:opacity-88 disabled:opacity-40"
             >
               {running ? "Running…" : "Run"}
-            </button>
+            </Button>
 
             {running && !revoked && (
-              <button
-                onClick={revokeNow}
-                disabled={revoking}
-                className="rounded-md border border-deny px-4 py-2.5 text-[14px] font-medium text-deny transition-colors hover:bg-deny-wash disabled:opacity-50"
-              >
-                {revoking ? "Revoking…" : "Revoke"}
-              </button>
+              <Button size="lg" variant="danger-quiet" onClick={revokeNow} disabled={revoking}>
+                {revoking ? "Withdrawing…" : "Withdraw now"}
+              </Button>
             )}
 
             {revoked && (
-              <span className="inline-flex items-center rounded border border-deny/25 bg-deny-wash px-2.5 py-2 font-mono text-[11px] font-medium uppercase tracking-[0.06em] text-deny">
-                revoked
+              <span className="inline-flex h-[42px] items-center rounded-xs border border-deny/25 bg-deny-wash px-3 font-mono text-micro font-medium uppercase tracking-[0.07em] text-deny">
+                withdrawn
               </span>
             )}
           </div>
         </div>
 
+        {/* The two switches below change what the demo does, not what the product is.
+            Labelling them as such is the difference between a demo and a trick. */}
+        <div
+          role="group"
+          aria-label="Demo conditions"
+          className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-2"
+        >
+          <span className="eyebrow">Demo conditions</span>
+          <label className="flex cursor-pointer items-center gap-2">
+            <input
+              type="checkbox"
+              checked={chaos}
+              onChange={(e) => setChaos(e.target.checked)}
+              disabled={running}
+              className="h-3.5 w-3.5 accent-[var(--color-hold)]"
+            />
+            <span className="text-ui text-ink-mute">
+              Make Razorpay time out once, to show the retry
+            </span>
+          </label>
+          <label className="flex cursor-pointer items-center gap-2">
+            <input
+              type="checkbox"
+              checked={pauseForRevocation}
+              onChange={(e) => setPauseForRevocation(e.target.checked)}
+              disabled={running}
+              className="h-3.5 w-3.5 accent-[var(--color-ink)]"
+            />
+            <span className="text-ui text-ink-mute">
+              Hold mid-run, so there is time to withdraw
+            </span>
+          </label>
+        </div>
+
         {selected && selected.status !== "ACTIVE" && (
-          <p className="mt-3 rounded-md border border-hold/25 bg-hold-wash px-3 py-2 text-[13px] text-hold">
+          <p className="mt-4 rounded-sm border border-hold/25 bg-hold-wash px-3 py-2 text-ui text-hold">
             This mandate is {selected.status.toLowerCase()}. Every attempt will be
             refused, which is worth watching at least once.
           </p>
         )}
-      </Card>
+      </div>
 
       {/* -------------------------------------------------------------- runway */}
-      <Card>
-        <Runway
-          capPaise={spend?.cap ?? selected?.totalCapPaise ?? 0}
-          spentPaise={spend?.spent ?? selected?.spentPaise ?? 0}
-          blockedPaise={worstBlock?.amountPaise ?? null}
-          blockedLabel={worstBlock ? `${worstBlock.productName} refused` : null}
-        />
-      </Card>
+      <Runway
+        capPaise={spend?.cap ?? selected?.totalCapPaise ?? 0}
+        spentPaise={spend?.spent ?? selected?.spentPaise ?? 0}
+        blockedPaise={worstBlock?.amountPaise ?? null}
+        blockedLabel={worstBlock ? `${worstBlock.productName} refused` : null}
+      />
 
       {/* ----------------------------------------------------------- the panes */}
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card pad={false} className="flex h-[520px] flex-col">
-          <div className="flex items-baseline justify-between border-b border-line px-5 py-3.5">
-            <h2 className="text-[13px] font-semibold">Buyer</h2>
-            <span className="font-mono text-[10px] uppercase tracking-[0.06em] text-ink-mute">
-              scripted · no model
-            </span>
-          </div>
+        <Panel pad={false} className="flex h-[460px] flex-col lg:h-[540px]">
+          <PanelHead
+            title="Buyer"
+            aside={
+              <span className="font-mono text-nano uppercase tracking-[0.07em] text-ink-soft">
+                scripted · no model
+              </span>
+            }
+          />
 
-          <div ref={leftRef} className="flex-1 space-y-3 overflow-y-auto px-5 py-4">
+          <div ref={leftRef} className="flex-1 space-y-3.5 overflow-y-auto px-4 py-4">
             {narration.length === 0 && (
-              <p className="pt-16 text-center text-[13px] text-ink-mute">
+              <p className="human px-2 pt-14 text-center text-lede leading-relaxed text-ink-soft">
                 What the buyer decides to do appears here. None of it is trusted.
               </p>
             )}
             {narration.map((n) => (
               <p
                 key={n.key}
-                className={`text-[13px] leading-relaxed ${
+                className={`human text-lede leading-[1.6] ${
                   n.kind === "plan"
                     ? "text-ink"
                     : n.tone === "warn"
-                      ? "rounded-md border border-hold/25 bg-hold-wash px-3 py-2 text-hold"
+                      ? "rounded-sm border border-hold/25 bg-hold-wash px-3 py-2 text-hold"
                       : "border-l-2 border-line pl-3 text-ink-mute"
                 }`}
               >
@@ -428,35 +446,34 @@ export function RunConsole({ mandates }: { mandates: RunMandate[] }) {
               </p>
             ))}
           </div>
+        </Panel>
 
-        </Card>
-
-        <Card pad={false} className="flex h-[520px] flex-col">
-          <div className="flex items-baseline justify-between border-b border-line px-5 py-3.5">
-            <h2 className="text-[13px] font-semibold">Gateway</h2>
-            <span className="font-mono text-[10px] uppercase tracking-[0.06em] text-ink-mute">
-              {runId ?? "idle"}
-            </span>
-          </div>
+        <Panel pad={false} className="flex h-[460px] flex-col lg:h-[540px]">
+          <PanelHead
+            title="Gateway"
+            aside={
+              <span className="font-mono text-nano text-ink-soft">{runId ?? "idle"}</span>
+            }
+          />
 
           <div ref={rightRef} className="flex-1 overflow-y-auto">
             {attempts.length === 0 ? (
-              <p className="px-5 pt-16 text-center text-[13px] text-ink-mute">
+              <p className="px-6 pt-14 text-center text-ui leading-relaxed text-ink-soft">
                 Every verdict is decided here, from the catalog price and the signed
                 terms.
               </p>
             ) : (
-              <ul className="divide-y divide-line">
+              <ul className="divide-y divide-hairline">
                 {attempts.map((a) => (
-                  <li key={a.key} className="px-5 py-3.5">
+                  <li key={a.key} className="px-4 py-3.5">
                     <div className="flex items-baseline justify-between gap-3">
-                      <span className="truncate text-[13px]">{a.productName}</span>
-                      <span className="shrink-0 font-mono text-[13px] tnum">
+                      <span className="truncate text-body">{a.productName}</span>
+                      <span className="shrink-0 font-mono text-body tnum">
                         {formatPaise(BigInt(Math.round(a.amountPaise)))}
                       </span>
                     </div>
 
-                    <div className="mt-0.5 truncate font-mono text-[10px] text-ink-mute">
+                    <div className="mt-0.5 truncate font-mono text-nano text-ink-soft">
                       {a.merchantName} · {a.sku}
                     </div>
 
@@ -465,21 +482,21 @@ export function RunConsole({ mandates }: { mandates: RunMandate[] }) {
                         <div className="mt-2 flex flex-wrap items-center gap-2">
                           <VerdictPill verdict={a.decision.verdict} />
                           {a.decision.reasonCode && (
-                            <span className="font-mono text-[11px] font-medium">
+                            <span className="font-mono text-micro font-medium">
                               {a.decision.reasonCode}
                             </span>
                           )}
-                          <span className="ml-auto font-mono text-[10px] tnum text-ink-mute">
+                          <span className="ml-auto font-mono text-nano tnum text-ink-soft">
                             {(a.decision.latencyUs / 1000).toFixed(2)}ms
                           </span>
                         </div>
 
                         {a.decision.violations.length > 1 && (
-                          <div className="mt-1.5 rounded border border-deny/20 bg-deny-wash px-2 py-1.5">
-                            <span className="font-mono text-[10px] uppercase tracking-[0.06em] text-deny">
+                          <div className="mt-2 rounded-sm border border-deny/20 bg-deny-wash px-2.5 py-2">
+                            <span className="font-mono text-nano uppercase tracking-[0.07em] text-deny">
                               {a.decision.violations.length} bounds broken at once
                             </span>
-                            <div className="mt-1 font-mono text-[10px] leading-relaxed text-deny/85">
+                            <div className="mt-1.5 font-mono text-nano leading-relaxed text-deny">
                               {a.decision.violations.map((v) => v.reasonCode).join("  ·  ")}
                             </div>
                           </div>
@@ -488,7 +505,7 @@ export function RunConsole({ mandates }: { mandates: RunMandate[] }) {
                         <DecisionExplanation decision={a.decision} />
 
                         {a.decision.recovered && (
-                          <div className="mt-1.5 rounded border border-hold/25 bg-hold-wash px-2 py-1.5 text-[11px] leading-relaxed text-hold">
+                          <div className="mt-2 rounded-sm border border-hold/25 bg-hold-wash px-2.5 py-2 text-micro leading-relaxed text-hold">
                             Razorpay failed ({a.decision.recovered.failure}) and the call
                             was retried with the same idempotency key. One order, one
                             charge.
@@ -496,7 +513,7 @@ export function RunConsole({ mandates }: { mandates: RunMandate[] }) {
                         )}
 
                         {a.decision.razorpayOrderId && (
-                          <div className="mt-1.5 font-mono text-[10px] text-ink-mute">
+                          <div className="mt-2 font-mono text-nano text-ink-soft">
                             {a.decision.razorpayOrderId}
                             {a.decision.paymentLinkUrl && (
                               <>
@@ -505,7 +522,7 @@ export function RunConsole({ mandates }: { mandates: RunMandate[] }) {
                                   href={a.decision.paymentLinkUrl}
                                   target="_blank"
                                   rel="noreferrer"
-                                  className="text-ink underline underline-offset-2"
+                                  className={`text-ink ${linkClass}`}
                                 >
                                   payment link
                                 </a>
@@ -515,7 +532,7 @@ export function RunConsole({ mandates }: { mandates: RunMandate[] }) {
                         )}
                       </>
                     ) : (
-                      <div className="mt-2 font-mono text-[10px] uppercase tracking-[0.06em] text-ink-mute">
+                      <div className="mt-2 font-mono text-nano uppercase tracking-[0.07em] text-ink-soft">
                         deciding…
                       </div>
                     )}
@@ -526,29 +543,26 @@ export function RunConsole({ mandates }: { mandates: RunMandate[] }) {
           </div>
 
           {ended && (
-            <div className="flex items-center gap-4 border-t border-line px-5 py-3 font-mono text-[11px] tnum">
+            <div className="flex items-center gap-4 border-t border-hairline bg-sunk px-4 py-2.5 font-mono text-micro tnum">
               <span className="text-permit">{ended.summary.allowed} allowed</span>
               <span className="text-deny">{ended.summary.blocked} refused</span>
               <span className="text-ink-mute">
                 {formatPaise(BigInt(Math.round(ended.summary.spentPaise)))} spent
               </span>
               {runId && (
-                <Link
-                  href={`/ledger?mandate=${mandateId}`}
-                  className="ml-auto text-ink underline underline-offset-2"
-                >
+                <Link href={`/ledger?mandate=${mandateId}`} className={`ml-auto ${linkClass}`}>
                   See the trail
                 </Link>
               )}
             </div>
           )}
-        </Card>
+        </Panel>
       </div>
 
-      <p className="px-1 text-[12px] leading-relaxed text-ink-mute">
-        Each allowed purchase creates a real Razorpay order, which authorises a
-        collection rather than completing one. Settlement needs a payment instrument,
-        which this prototype does not provision.
+      <p className="max-w-[76ch] border-t border-line pt-5 text-small leading-relaxed text-ink-soft">
+        Each allowed purchase creates a real Razorpay order, which authorises a collection
+        rather than completing one. Settlement needs a payment instrument, which this
+        prototype does not provision.
       </p>
     </div>
   );

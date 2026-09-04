@@ -24,8 +24,9 @@ export default async function NewMandatePage() {
   return (
     <Page
       wide
+      kicker="Grant spending authority"
       title="New mandate"
-      lede="Set the limits. The panel on the right shows exactly what they would permit and refuse, before you sign anything."
+      lede="Set the limits. The panel beside them shows exactly what they would permit and refuse, against the real catalog, before you sign anything."
     >
       <MandateForm
         merchants={merchants.map((m) => ({

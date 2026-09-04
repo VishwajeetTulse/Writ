@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Button } from "@/components/ui";
 
 interface Verification {
   valid: boolean;
@@ -42,9 +43,9 @@ export function VerifyChain({ recordCount }: { recordCount: number }) {
   return (
     <div className="flex items-center gap-3">
       {result && (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2" role="status">
           <span
-            className={`inline-flex items-center rounded border px-1.5 py-0.5 font-mono text-[10px] font-medium uppercase tracking-[0.06em] ${
+            className={`inline-flex items-center rounded-xs border px-1.5 py-0.5 font-mono text-nano font-medium uppercase tracking-[0.07em] ${
               result.valid
                 ? "border-permit/25 bg-permit-wash text-permit"
                 : "border-deny/25 bg-deny-wash text-deny"
@@ -52,21 +53,17 @@ export function VerifyChain({ recordCount }: { recordCount: number }) {
           >
             {result.valid ? "chain intact" : "chain broken"}
           </span>
-          <span className="font-mono text-[11px] tnum text-ink-mute">
+          <span className="font-mono text-micro tnum text-ink-soft">
             {result.valid
               ? `${result.recordCount} records · ${ms}ms`
-              : `broke at seq ${result.brokenAtSeq ?? "?"}`}
+              : (result.reason ?? `broke at seq ${result.brokenAtSeq ?? "?"}`)}
           </span>
         </div>
       )}
 
-      <button
-        onClick={verify}
-        disabled={running}
-        className="rounded-md border border-line bg-surface px-3 py-1.5 text-[13px] transition-colors hover:border-line-strong disabled:opacity-60"
-      >
+      <Button onClick={verify} disabled={running} variant="secondary">
         {running ? "Verifying…" : "Verify chain"}
-      </button>
+      </Button>
     </div>
   );
 }

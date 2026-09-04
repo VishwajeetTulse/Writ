@@ -11,10 +11,10 @@ import {
   violationsFrom,
 } from "@/lib/format";
 import { Runway } from "@/components/runway";
-import { StatusPill } from "@/components/verdict";
+import { SignatureSeal, StatusPill } from "@/components/verdict";
 import { plainReason } from "@/lib/explain";
 import { RevokeButton } from "@/components/revoke-button";
-import { Card, Field, Page } from "@/components/ui";
+import { Field, linkClass, Page, Section, Stack, Stat } from "@/components/ui";
 import { requireUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -22,11 +22,11 @@ export const dynamic = "force-dynamic";
 /**
  * One mandate, in full.
  *
- * The page is arranged around a claim and its evidence. The terms panel is what was
- * granted; the runway is what has been used and what was stopped; the two tables below
- * are what actually happened, taken from the ledger rather than recomputed. The
- * signature line at the bottom of the terms is the load-bearing one: it says whether
- * the terms on this screen are the terms a human signed.
+ * The page is arranged around a claim and its evidence. The intent sentence is the
+ * title, because it is what a person actually granted; the runway is what has been used
+ * and what was stopped; the tables below are what happened, read from the ledger rather
+ * than recomputed. The signature line is the load-bearing one: it says whether the
+ * terms on this screen are the terms a human signed.
  */
 export default async function MandateDetailPage({ params }: PageProps<"/mandates/[id]">) {
   const user = await requireUser();
@@ -49,8 +49,14 @@ export default async function MandateDetailPage({ params }: PageProps<"/mandates
 
   return (
     <Page
-      title={row.id}
-      lede={row.intentText}
+      kicker={
+        <span className="flex items-center gap-2">
+          <span>Mandate</span>
+          <span className="text-line-strong">·</span>
+          <span className="normal-case tracking-normal">{row.id}</span>
+        </span>
+      }
+      title={row.intentText}
       actions={
         <>
           <StatusPill status={status} />
@@ -58,8 +64,20 @@ export default async function MandateDetailPage({ params }: PageProps<"/mandates
         </>
       }
     >
-      <div className="space-y-4">
-        <Card>
+      <Stack>
+        {!signatureValid && (
+          <div className="rounded-md border border-deny/30 bg-deny-wash px-4 py-3">
+            <p className="human text-lede text-deny">
+              These terms have been changed since they were signed.
+            </p>
+            <p className="mt-1 text-ui leading-relaxed text-deny">
+              Nothing can be spent against this mandate. Every figure below is being read
+              from a record that no longer matches what anyone agreed to.
+            </p>
+          </div>
+        )}
+
+        <Section title="Standing">
           <Runway
             capPaise={Number(row.totalCapPaise)}
             spentPaise={Number(detail.spentPaise)}
@@ -67,51 +85,67 @@ export default async function MandateDetailPage({ params }: PageProps<"/mandates
             blockedLabel={breachLabel}
           />
 
-          <div className="mt-5 grid grid-cols-2 gap-5 border-t border-line pt-5 sm:grid-cols-4">
-            <Field label="Spent">{formatPaise(detail.spentPaise)}</Field>
-            <Field label="Remaining">
-              {formatPaise(detail.remainingPaise > 0n ? detail.remainingPaise : 0n)}
-            </Field>
-            <Field label="Purchases">{detail.purchaseCount}</Field>
-            <Field label="Refused">
-              <span className={detail.blockCount > 0 ? "text-deny" : ""}>
-                {detail.blockCount}
+          <div className="mt-7 grid grid-cols-2 gap-x-6 gap-y-7 sm:grid-cols-4">
+            <Stat
+              lead
+              label="Left to spend"
+              value={formatPaise(detail.remainingPaise > 0n ? detail.remainingPaise : 0n, {
+                showPaise: false,
+              })}
+            />
+            <Stat label="Spent" value={formatPaise(detail.spentPaise, { showPaise: false })} />
+            <Stat label="Bought" value={detail.purchaseCount} />
+            <Stat
+              label="Stopped"
+              value={detail.blockCount}
+              tone={detail.blockCount > 0 ? "deny" : "mute"}
+            />
+          </div>
+        </Section>
+
+        <Section
+          title="Signed terms"
+          aside={
+            <span className="flex items-center gap-2">
+              <SignatureSeal valid={signatureValid} />
+              <span
+                className="hidden font-mono text-nano text-ink-soft sm:inline"
+                title={row.signature}
+              >
+                {truncateHash(row.signature, 10, 6)}
               </span>
-            </Field>
-          </div>
-        </Card>
-
-        <Card>
-          <h2 className="mb-4 text-[13px] font-semibold">Signed terms</h2>
-
-          <div className="grid grid-cols-2 gap-5 sm:grid-cols-4">
-            <Field label="Per transaction">{formatPaise(terms.perTxnCapPaise)}</Field>
-            <Field label="Total cap">{formatPaise(terms.totalCapPaise)}</Field>
-            <Field label="Velocity">{velocity ?? "—"}</Field>
+            </span>
+          }
+        >
+          <div className="grid grid-cols-2 gap-x-6 gap-y-6 sm:grid-cols-4">
+            <Field label="Per purchase">{formatPaise(terms.perTxnCapPaise)}</Field>
+            <Field label="Total">{formatPaise(terms.totalCapPaise)}</Field>
+            <Field label="Rate limit">{velocity ?? "none"}</Field>
             <Field label="Expires">
-              {timestamp(row.expiresAt)}{" "}
-              <span className="text-ink-mute">({relativeTime(row.expiresAt)})</span>
+              {timestamp(row.expiresAt)}
+              <span className="block text-ink-soft">{relativeTime(row.expiresAt)}</span>
             </Field>
           </div>
 
-          <div className="mt-5 grid gap-5 border-t border-line pt-5 sm:grid-cols-2">
+          <div className="mt-7 grid gap-6 border-t border-hairline pt-6 sm:grid-cols-2">
             <div>
-              <div className="eyebrow mb-1.5">Merchant allowlist</div>
-              <ul className="space-y-1">
+              <div className="eyebrow mb-2.5">May buy from</div>
+              <ul className="space-y-1.5">
                 {terms.merchants.map((m) => (
-                  <li key={m.id} className="font-mono text-[12px]">
-                    {m.name} <span className="text-ink-mute">{m.vpa}</span>
+                  <li key={m.id} className="flex items-baseline gap-2 text-ui">
+                    <span>{m.name}</span>
+                    <span className="font-mono text-micro text-ink-soft">{m.vpa}</span>
                   </li>
                 ))}
               </ul>
             </div>
             <div>
-              <div className="eyebrow mb-1.5">Categories</div>
+              <div className="eyebrow mb-2.5">May buy</div>
               <div className="flex flex-wrap gap-1.5">
                 {terms.categories.map((c) => (
                   <span
                     key={c}
-                    className="rounded border border-line bg-ground px-1.5 py-0.5 font-mono text-[11px]"
+                    className="rounded-xs border border-line bg-surface px-1.5 py-0.5 font-mono text-micro"
                   >
                     {c}
                   </span>
@@ -119,86 +153,53 @@ export default async function MandateDetailPage({ params }: PageProps<"/mandates
               </div>
             </div>
           </div>
+        </Section>
 
-          {/* The load-bearing line. If this ever says otherwise, every verdict above
-              was reached against terms nobody agreed to. */}
-          <div className="mt-5 flex items-center gap-2 border-t border-line pt-4">
-            <span
-              className={`inline-flex items-center rounded border px-1.5 py-0.5 font-mono text-[10px] font-medium uppercase tracking-[0.06em] ${
-                signatureValid
-                  ? "border-permit/25 bg-permit-wash text-permit"
-                  : "border-deny/25 bg-deny-wash text-deny"
-              }`}
-            >
-              {signatureValid ? "signature valid" : "signature invalid"}
-            </span>
-            <span className="font-mono text-[11px] text-ink-mute">
-              {truncateHash(row.signature, 12, 8)}
-            </span>
-            {!signatureValid && (
-              <span className="ml-auto text-[12px] text-deny">
-                These terms have been changed since they were signed. Nothing can be
-                spent against this mandate.
-              </span>
-            )}
-          </div>
-        </Card>
-
-        <div className="grid gap-4 lg:grid-cols-2">
-          <Card pad={false}>
-            <h2 className="border-b border-line px-5 py-3.5 text-[13px] font-semibold">
-              Purchases
-            </h2>
+        <div className="grid gap-11 lg:grid-cols-2">
+          <Section title={`Bought · ${purchases.length}`}>
             {purchases.length === 0 ? (
-              <p className="px-5 py-8 text-center text-[13px] text-ink-mute">
-                Nothing bought against this mandate yet.
+              <p className="py-6 text-ui text-ink-soft">
+                Nothing has been bought against this mandate.
               </p>
             ) : (
-              <ul className="divide-y divide-line">
+              <ul className="divide-y divide-hairline border-b border-hairline">
                 {purchases.map((p) => (
-                  <li key={p.id} className="px-5 py-3">
+                  <li key={p.id} className="py-3">
                     <div className="flex items-baseline justify-between gap-3">
-                      <span className="truncate font-mono text-[12px]">{p.sku}</span>
-                      <span className="shrink-0 font-mono text-[12px] tnum">
+                      <span className="truncate font-mono text-micro">{p.sku}</span>
+                      <span className="shrink-0 font-mono text-ui tnum">
                         {formatPaise(p.amountPaise)}
                       </span>
                     </div>
-                    <div className="mt-1 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.06em] text-ink-mute">
+                    <div className="mt-1 flex items-center gap-2 font-mono text-nano text-ink-soft">
                       <span
                         className={
                           p.status === "PAID"
-                            ? "text-permit"
+                            ? "uppercase tracking-[0.07em] text-permit"
                             : p.status === "FAILED"
-                              ? "text-deny"
-                              : ""
+                              ? "uppercase tracking-[0.07em] text-deny"
+                              : "uppercase tracking-[0.07em]"
                         }
                       >
                         {p.status}
                       </span>
-                      <span>·</span>
-                      <span className="truncate normal-case tracking-normal">
-                        {p.razorpayOrderId ?? "no order"}
-                      </span>
-                      <span className="ml-auto shrink-0 normal-case tracking-normal">
-                        {relativeTime(p.createdAt)}
-                      </span>
+                      <span className="truncate">{p.razorpayOrderId ?? "no order"}</span>
+                      <span className="ml-auto shrink-0">{relativeTime(p.createdAt)}</span>
                     </div>
                   </li>
                 ))}
               </ul>
             )}
-          </Card>
+          </Section>
 
-          <Card pad={false}>
-            <h2 className="border-b border-line px-5 py-3.5 text-[13px] font-semibold">
-              Refused
-            </h2>
+          <Section title={`Stopped · ${refusals.length}`}>
             {refusals.length === 0 ? (
-              <p className="px-5 py-8 text-center text-[13px] text-ink-mute">
-                Nothing has been refused against this mandate.
+              <p className="py-6 text-ui text-ink-soft">
+                Nothing has been stopped. Either the agent has stayed inside these limits,
+                or it has not tried anything yet.
               </p>
             ) : (
-              <ul className="divide-y divide-line">
+              <ul className="divide-y divide-hairline border-b border-hairline">
                 {refusals.map((e) => {
                   const payload = parsePayload(e.payload);
                   const violations = violationsFrom(payload);
@@ -206,16 +207,16 @@ export default async function MandateDetailPage({ params }: PageProps<"/mandates
                     typeof payload.productName === "string" ? payload.productName : e.type;
 
                   return (
-                    <li key={e.seq} className="px-5 py-3">
+                    <li key={e.seq} className="py-3">
                       <div className="flex items-baseline justify-between gap-3">
-                        <span className="truncate text-[13px]">{name}</span>
+                        <span className="truncate text-ui">{name}</span>
                         {e.amountPaise !== null && (
-                          <span className="shrink-0 font-mono text-[12px] tnum text-deny">
+                          <span className="shrink-0 font-mono text-ui tnum text-deny">
                             {formatPaise(e.amountPaise)}
                           </span>
                         )}
                       </div>
-                      <div className="mt-1 text-[12px] text-ink-mute">
+                      <div className="mt-1 text-small text-ink-mute">
                         {plainReason(e.reasonCode)}
                         {violations.length > 1 &&
                           `, and ${violations.length - 1} other reason${
@@ -227,16 +228,13 @@ export default async function MandateDetailPage({ params }: PageProps<"/mandates
                 })}
               </ul>
             )}
-          </Card>
+          </Section>
         </div>
 
-        <Link
-          href={`/ledger?mandate=${row.id}`}
-          className="inline-block pt-1 text-[13px] text-ink underline underline-offset-2"
-        >
-          See everything this mandate has done
+        <Link href={`/ledger?mandate=${row.id}`} className={`text-ui ${linkClass}`}>
+          Everything this mandate has done, in order
         </Link>
-      </div>
+      </Stack>
     </Page>
   );
 }

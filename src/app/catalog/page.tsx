@@ -3,7 +3,7 @@ import { addressesAgents, listMerchants, searchCatalog } from "@/lib/catalog";
 import { coverageFor, type ActiveMandate } from "@/lib/catalog-coverage";
 import { activeMandatesFor } from "@/lib/mandate-service";
 import { currentUser } from "@/lib/session";
-import { Empty, Page } from "@/components/ui";
+import { buttonClass, Empty, linkClass, Page } from "@/components/ui";
 import { CatalogBrowser, type CatalogMerchantView } from "@/components/catalog-browser";
 
 export const dynamic = "force-dynamic";
@@ -59,29 +59,26 @@ export default async function CatalogPage() {
 
   return (
     <Page
+      wide
+      kicker="Open to any buyer"
       title="Catalog"
       lede="What an AI buyer can see. Four shops and their stock, seeded as demo data — a real merchant would publish its own feed."
       actions={
         user ? (
-          <Link
-            href="/mandates/new"
-            className="rounded-md bg-ink px-3.5 py-2 text-[13px] font-medium text-surface transition-opacity hover:opacity-88"
-          >
+          <Link href="/mandates/new" className={buttonClass("primary", "md")}>
             New mandate
           </Link>
         ) : (
-          <Link
-            href="/sign-in"
-            className="rounded-md bg-ink px-3.5 py-2 text-[13px] font-medium text-surface transition-opacity hover:opacity-88"
-          >
+          <Link href="/sign-in" className={buttonClass("primary", "md")}>
             Sign in
           </Link>
         )
       }
     >
       {view.length === 0 ? (
-        <Empty>
-          The catalog is empty. Run <span className="font-mono">npm run db:seed</span>.
+        <Empty title="The catalog has not been seeded.">
+          Run <span className="font-mono">npm run db:seed</span> to load the four demo
+          shops and their stock. Until then an agent has nothing to shop.
         </Empty>
       ) : (
         <>
@@ -91,9 +88,9 @@ export default async function CatalogPage() {
             hasMandates={mandates.length > 0}
           />
 
-          <p className="mt-6 max-w-[70ch] text-[12.5px] leading-relaxed text-ink-mute">
+          <p className="mt-10 max-w-[70ch] border-t border-line pt-5 text-small leading-relaxed text-ink-soft">
             Anyone can read this list without an account, as JSON at{" "}
-            <a href="/api/catalog" className="font-mono underline">
+            <a href="/api/catalog" className={`font-mono ${linkClass}`}>
               /api/catalog
             </a>
             . Buying from it takes a signed mandate.

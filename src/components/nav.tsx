@@ -2,6 +2,18 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { buttonClass } from "@/components/ui";
+
+/**
+ * The masthead.
+ *
+ * The active tab is marked with a rule sitting on the header's own bottom border, not
+ * with a filled pill. A pill in a neutral tint is nearly invisible against a neutral
+ * page; a 2px rule in ink is unmistakable at a glance and costs no colour.
+ *
+ * The wordmark is set in the serif — the same voice the product uses for anything a
+ * person wrote. Writ is a word before it is a piece of software.
+ */
 
 const LINKS = [
   { href: "/", label: "Mandates", open: false },
@@ -31,27 +43,37 @@ export function Nav({
   const links = user ? LINKS : LINKS.filter((link) => link.open);
 
   return (
-    <header className="border-b border-line bg-surface">
-      <div className="mx-auto flex h-14 max-w-[1400px] items-center gap-6 overflow-x-auto px-6">
-        <Link href="/" className="flex shrink-0 items-baseline gap-2">
-          <span className="text-[17px] font-semibold tracking-[-0.02em]">Writ</span>
-          <span className="eyebrow hidden sm:inline">spending authority</span>
+    <header className="sticky top-0 z-30 border-b border-line bg-surface/92 backdrop-blur-[2px]">
+      <div className="mx-auto flex h-[52px] max-w-[1400px] items-stretch gap-6 px-5 sm:px-8">
+        <Link
+          href="/"
+          className="flex shrink-0 items-center gap-2.5 self-center"
+          aria-label="Writ, home"
+        >
+          <span className="human text-title leading-none tracking-[-0.01em]">Writ</span>
+          <span
+            aria-hidden
+            className="hidden h-3.5 w-px bg-line-strong sm:block"
+          />
+          <span className="eyebrow hidden sm:block">spending authority</span>
         </Link>
 
-        <nav className="flex shrink-0 items-center gap-1">
+        <nav className="scroller -mb-px flex min-w-0 items-stretch gap-0.5">
           {links.map((link) => {
             const active =
               link.href === "/"
                 ? pathname === "/" || pathname.startsWith("/mandates")
                 : pathname.startsWith(link.href);
+
             return (
               <Link
                 key={link.href}
                 href={link.href}
-                className={`whitespace-nowrap rounded px-3 py-1.5 text-[13px] transition-colors ${
+                aria-current={active ? "page" : undefined}
+                className={`flex items-center whitespace-nowrap border-b-2 px-3 text-ui transition-colors ${
                   active
-                    ? "bg-ground font-medium text-ink"
-                    : "text-ink-mute hover:text-ink"
+                    ? "border-ink font-medium text-ink"
+                    : "border-transparent text-ink-mute hover:text-ink"
                 }`}
               >
                 {link.label}
@@ -60,39 +82,39 @@ export function Nav({
           })}
         </nav>
 
-        <div className="ml-auto flex shrink-0 items-center gap-3">
-          <span className="hidden rounded border border-line px-2 py-1 font-mono text-[10px] uppercase tracking-[0.08em] text-ink-mute md:inline">
-            Razorpay test mode
+        <div className="ml-auto flex shrink-0 items-center gap-3 self-center">
+          <span
+            title="No live keys are configured. Nothing here can move real money."
+            className="hidden rounded-xs border border-line px-1.5 py-0.5 font-mono text-nano uppercase tracking-[0.07em] text-ink-soft lg:inline"
+          >
+            test mode
           </span>
 
           {user && (
             <>
-              <span
-                className="hidden max-w-[180px] truncate text-[13px] text-ink-mute sm:inline"
-                title={user.email ?? undefined}
-              >
-                {user.name ?? user.email}
-              </span>
-
               {user.image && (
                 // A Google avatar on a remote host. next/image would need that host
-                // allowlisted in the config for a 26px decoration, which is not a
+                // allowlisted in the config for a 24px decoration, which is not a
                 // trade worth making.
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={user.image}
                   alt=""
-                  width={26}
-                  height={26}
-                  className="h-[26px] w-[26px] shrink-0 rounded-full border border-line"
+                  width={24}
+                  height={24}
+                  className="h-6 w-6 shrink-0 rounded-full border border-line"
                 />
               )}
 
+              <span
+                className="hidden max-w-[150px] truncate text-ui text-ink-mute md:inline"
+                title={user.email ?? undefined}
+              >
+                {user.name ?? user.email}
+              </span>
+
               <form action={signOutAction}>
-                <button
-                  type="submit"
-                  className="whitespace-nowrap rounded-md border border-line px-2.5 py-1.5 text-[13px] text-ink-mute transition-colors hover:border-line-strong hover:text-ink"
-                >
+                <button type="submit" className={buttonClass("ghost", "sm")}>
                   Sign out
                 </button>
               </form>

@@ -3,37 +3,115 @@
 /*
  * Writ's design system.
  *
- * One rule drives all of it: the machine speaks in mono, the human speaks in sans.
- * Anything the system decided — a verdict, a reason code, an amount, a hash, a
- * latency — is set in IBM Plex Mono, because it is a value that was computed and can
- * be checked. Anything a person wrote or reads as prose is Instrument Sans.
+ * ---------------------------------------------------------------------------
+ * THREE VOICES
+ * ---------------------------------------------------------------------------
  *
- * A judge should be able to tell, at a glance and without reading a word, which parts
- * of this screen are claims and which are evidence.
+ * Everything on screen was said by one of three parties, and each gets its own
+ * typeface. You should be able to tell them apart without reading a word.
+ *
+ *   SERIF (Newsreader)     What a person wrote, or is being told. The intent a human
+ *                          typed into a mandate. The sentence explaining a refusal.
+ *                          Page titles, because a title is addressed to a reader.
+ *
+ *   MONO (IBM Plex Mono)   What the machine computed. Amounts, reason codes, hashes,
+ *                          latencies, ids, timestamps. Anything that is a value rather
+ *                          than a claim, and that could be checked.
+ *
+ *   SANS (Instrument Sans) The chrome. Buttons, labels, navigation, form controls.
+ *                          The parts of the interface that are neither party talking —
+ *                          they are the room the conversation happens in.
+ *
+ * A serif at UI sizes is a mistake, so the serif is never used below 15px.
+ *
+ * ---------------------------------------------------------------------------
+ * SURFACES
+ * ---------------------------------------------------------------------------
+ *
+ * Four levels, and no shadows anywhere. Depth comes from tone and hairlines, which is
+ * what light-mode financial interfaces have always done — a statement is ink on paper,
+ * not a stack of floating cards.
+ *
+ *   ground   The page. Most content sits directly on it, grouped by rules and space.
+ *   surface  A raised panel. Reserved for a discrete OBJECT — a mandate, a live run
+ *            pane, a modal. Never for "a section of a page".
+ *   sunk     A recessed region. Table headers, expanded detail rows, inert areas.
+ *   hairline The divider inside a panel. Deliberately lighter than the panel's own
+ *            border, so a container never competes with its contents.
+ *
+ * ---------------------------------------------------------------------------
+ * COLOUR
+ * ---------------------------------------------------------------------------
+ *
+ * A warm near-neutral ramp and exactly three chromatic colours, each of which means a
+ * verdict. There is no brand accent, no gradient and no decorative hue anywhere in this
+ * product: in an interface about whether money may move, a colour that means nothing
+ * would dilute the three that mean everything.
  *
  * Deliberately light-only. This is a console shown on a projector under conference
  * lighting, and a theme that follows the viewer's OS is a way to lose the demo.
  */
 
 @theme {
-  --color-ground: #f7f7f5;
+  /* Neutrals — warm, so the ground reads as paper rather than as a grey UI chrome.
+
+     Three ink weights, all of which clear 4.5:1 on the page: 17.1, 7.9 and 4.8. The
+     tertiary weight carries 10px uppercase labels, so it does not get to be as quiet as
+     it would like to be. */
+  --color-ground: #f8f7f4;
   --color-surface: #ffffff;
-  --color-line: #e4e4e0;
-  --color-line-strong: #c9c9c2;
-  --color-ink: #16161a;
-  --color-ink-mute: #6b6b73;
+  --color-sunk: #f1efea;
+  --color-hairline: #eceae4;
+  --color-line: #e1dfd8;
+  --color-line-strong: #c8c5ba;
+  --color-ink: #16150f;
+  --color-ink-mute: #4f4d45;
+  --color-ink-soft: #706d63;
 
   /* The three verdicts. Never used decoratively — a colour here always means a
-     decision the policy engine made. */
-  --color-permit: #0f7a5a;
-  --color-permit-wash: #e8f3ef;
-  --color-deny: #c7361f;
-  --color-deny-wash: #fbecea;
-  --color-hold: #b4761a;
-  --color-hold-wash: #fbf2e4;
+     decision the policy engine made.
+
+     Each is dark enough to clear 4.5:1 against its own wash, which is what pins the
+     exact values: the first draft of this palette was a step lighter and the amber
+     failed on its own background at 4.33:1. Contrast measured, not eyeballed. */
+  --color-permit: #0c6b4e;
+  --color-permit-wash: #e9f2ee;
+  --color-deny: #b8321c;
+  --color-deny-wash: #fbeae6;
+  --color-hold: #8f5f10;
+  --color-hold-wash: #f9f1e1;
 
   --font-sans: var(--font-instrument-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-newsreader), ui-serif, Georgia, serif;
   --font-mono: var(--font-plex-mono), ui-monospace, "SF Mono", Menlo, monospace;
+
+  /*
+   * The type scale. Eight steps, and nothing outside them.
+   *
+   * The old interface had twelve sizes, ten of which sat between 10px and 15px — a band
+   * so narrow that the eye had nothing to grab, which is why every section needed a box
+   * around it to be legible as a section. The jumps here are deliberately wide enough
+   * that typography can carry the hierarchy on its own.
+   */
+  --text-nano: 10px;
+  --text-micro: 11px;
+  --text-small: 12px;
+  --text-ui: 13px;
+  --text-body: 14px;
+  --text-lede: 15px;
+  --text-title: 19px;
+  --text-figure: 24px;
+  --text-display: 28px;
+  --text-hero: 38px;
+
+  /*
+   * Radius by rank, not by habit. Small radii read as precise; large ones read as soft,
+   * and this is not a soft product.
+   */
+  --radius-xs: 2px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
 }
 
 html {
@@ -48,18 +126,86 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Tabular figures everywhere money or a count appears, so digits line up in columns
-   and a number that changes does not make the layout twitch. */
+/*
+ * Tabular figures wherever a number appears, not only money. A count that changes
+ * should not make the layout twitch, and columns of digits should line up.
+ */
 .tnum {
   font-variant-numeric: tabular-nums;
 }
 
-/* The one-line label above a value. Small, wide, quiet. */
+/*
+ * The human voice. Applied to authored text and to prose addressed to a reader.
+ * Never below 15px — a serif at UI sizes is unreadable, not editorial.
+ */
+.human {
+  font-family: var(--font-serif);
+  font-optical-sizing: auto;
+  letter-spacing: -0.003em;
+}
+
+/*
+ * A section marker: small, wide, quiet, and followed by a rule that runs the width of
+ * the section. The rule is what makes it a heading — it groups the content beneath it
+ * without needing a box around it.
+ */
+.rubric {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--color-ink-mute);
+}
+
+/* The one-line label directly above a value. Tighter and quieter than a rubric. */
 .eyebrow {
   font-family: var(--font-mono);
   font-size: 10px;
   line-height: 1;
-  letter-spacing: 0.09em;
+  letter-spacing: 0.07em;
   text-transform: uppercase;
-  color: var(--color-ink-mute);
+  color: var(--color-ink-soft);
+}
+
+/*
+ * One focus ring for the whole application, on the element itself rather than bolted
+ * onto each component. Keyboard users get a visible, high-contrast target everywhere;
+ * mouse users never see it. The old interface had `outline-none` on every input and
+ * nothing at all on buttons.
+ */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-ink);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/*
+ * Horizontal scroll containers get a hint that there is more to the right, drawn as a
+ * fade rather than a scrollbar so it costs no height on a phone.
+ */
+.scroller {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+
+.scroller::-webkit-scrollbar {
+  height: 6px;
+}
+
+.scroller::-webkit-scrollbar-thumb {
+  background: var(--color-line-strong);
+  border-radius: 3px;
+}
+
+/* Motion communicates state. Anyone who has asked not to see it, does not. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

@@ -26,9 +26,9 @@ export function VerdictPill({
 }) {
   return (
     <span
-      className={`inline-flex items-center rounded border font-mono font-medium uppercase tracking-[0.06em] ${
+      className={`inline-flex items-center rounded-xs border font-mono font-medium uppercase tracking-[0.07em] ${
         VERDICT_STYLE[verdict]
-      } ${size === "lg" ? "px-2.5 py-1 text-[12px]" : "px-1.5 py-0.5 text-[10px]"}`}
+      } ${size === "lg" ? "px-2 py-1 text-micro" : "px-1.5 py-0.5 text-nano"}`}
     >
       {verdict}
     </span>
@@ -49,12 +49,12 @@ export function ReasonChip({
     <span className="inline-flex flex-col gap-0.5">
       <span
         title={label ?? code}
-        className="font-mono text-[11px] font-medium tracking-[0.02em] text-ink"
+        className="font-mono text-micro font-medium tracking-[0.01em] text-ink"
       >
         {code}
       </span>
       {withLabel && label && (
-        <span className="text-[12px] leading-snug text-ink-mute">{label}</span>
+        <span className="text-small leading-snug text-ink-mute">{label}</span>
       )}
     </span>
   );
@@ -63,19 +63,37 @@ export function ReasonChip({
 const STATUS_STYLE: Record<string, string> = {
   ACTIVE: "border-permit/25 bg-permit-wash text-permit",
   REVOKED: "border-deny/25 bg-deny-wash text-deny",
-  EXPIRED: "border-line-strong bg-ground text-ink-mute",
+  EXPIRED: "border-line-strong bg-sunk text-ink-mute",
   EXHAUSTED: "border-hold/25 bg-hold-wash text-hold",
-  DRAFT: "border-line-strong bg-ground text-ink-mute",
+  DRAFT: "border-line-strong bg-sunk text-ink-mute",
 };
 
 export function StatusPill({ status }: { status: string }) {
   return (
     <span
-      className={`inline-flex items-center rounded border px-1.5 py-0.5 font-mono text-[10px] font-medium uppercase tracking-[0.06em] ${
+      className={`inline-flex items-center rounded-xs border px-1.5 py-0.5 font-mono text-nano font-medium uppercase tracking-[0.07em] ${
         STATUS_STYLE[status] ?? STATUS_STYLE.DRAFT
       }`}
     >
       {status}
+    </span>
+  );
+}
+
+/**
+ * A signed-or-not seal. The load-bearing claim on the mandate screen: it says whether
+ * the terms being displayed are the terms someone actually agreed to.
+ */
+export function SignatureSeal({ valid }: { valid: boolean }) {
+  return (
+    <span
+      className={`inline-flex items-center rounded-xs border px-1.5 py-0.5 font-mono text-nano font-medium uppercase tracking-[0.07em] ${
+        valid
+          ? "border-permit/25 bg-permit-wash text-permit"
+          : "border-deny/25 bg-deny-wash text-deny"
+      }`}
+    >
+      {valid ? "signature valid" : "signature invalid"}
     </span>
   );
 }

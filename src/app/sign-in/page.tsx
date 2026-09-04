@@ -1,19 +1,23 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { signIn } from "@/lib/auth";
 import { currentUser } from "@/lib/session";
+import { buttonClass, linkClass } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
 /**
  * Sign in.
  *
+ * The one screen in the product that has to say what Writ is, because it is the only
+ * one a stranger reaches first. It says it in three lines and then gets out of the way:
+ * no hero, no feature grid, no illustration.
+ *
  * Google is the only way in, and there is no password field anywhere in this
  * application. That is a deliberate reduction: a product about controlling who may
  * spend your money should not also be in the business of storing credentials.
- *
- * If Google is not configured yet, the page says so and says what to do about it,
- * rather than failing at the redirect with something unreadable.
  */
+
 /** What each Auth.js error actually means for the person reading it. */
 const SIGN_IN_ERRORS: Record<string, string> = {
   AccessDenied:
@@ -38,70 +42,112 @@ export default async function SignInPage({ searchParams }: PageProps<"/sign-in">
   );
 
   return (
-    <div className="mx-auto flex min-h-[70vh] max-w-[440px] flex-col justify-center px-6 py-16">
-      <h1 className="text-[26px] font-semibold tracking-[-0.02em]">Sign in to Writ</h1>
-      <p className="mt-2.5 text-[15px] leading-relaxed text-ink-mute">
-        Writ lets you give an AI agent permission to spend a set amount, at shops you
-        choose, for as long as you decide. You can take that permission back at any
-        moment.
-      </p>
+    <div className="mx-auto flex min-h-[calc(100vh-52px)] max-w-[860px] flex-col justify-center px-5 py-16 sm:px-8">
+      <div className="grid gap-12 md:grid-cols-[minmax(0,1fr)_minmax(0,300px)] md:items-start md:gap-16">
+        <div>
+          <div className="eyebrow mb-4">Bounded spending authority</div>
 
-      {errorParam && (
-        <div className="mt-5 rounded-md border border-deny/25 bg-deny-wash px-3.5 py-2.5">
-          <p className="text-[13px] leading-relaxed text-deny">
-            {SIGN_IN_ERRORS[errorParam] ?? "Something went wrong signing you in."}
+          <h1 className="human max-w-[16ch] text-hero font-normal leading-[1.08] tracking-[-0.022em]">
+            Let an agent spend, without handing over the account.
+          </h1>
+
+          <p className="human mt-5 max-w-[52ch] text-lede leading-[1.6] text-ink-mute">
+            A mandate names the shops your agent may buy from, caps what it may spend at
+            once and in total, and expires on its own. Every request it makes is checked
+            against those terms before any money moves, and you can withdraw the whole
+            thing in one click.
           </p>
-          {/* The code, always. "Something went wrong" is useless to whoever has to
-              fix it, and this page is the only place the reason surfaces. */}
-          <p className="mt-1.5 font-mono text-[11px] text-deny/80">{errorParam}</p>
-        </div>
-      )}
 
-      {configured ? (
-        <form
-          action={async () => {
-            "use server";
-            await signIn("google", { redirectTo: "/" });
-          }}
-          className="mt-7"
-        >
-          <button
-            type="submit"
-            className="flex w-full items-center justify-center gap-3 rounded-md border border-line bg-surface px-4 py-3 text-[14px] font-medium transition-colors hover:border-line-strong"
-          >
-            <GoogleMark />
-            Continue with Google
-          </button>
-        </form>
-      ) : (
-        <div className="mt-7 rounded-md border border-hold/25 bg-hold-wash px-4 py-3.5">
-          <p className="text-[13px] font-medium text-hold">Google sign-in is not set up yet</p>
-          <ol className="mt-2.5 list-decimal space-y-1.5 pl-4 text-[13px] leading-relaxed text-ink-mute">
-            <li>
-              In the Google Cloud console, create an OAuth client of type{" "}
-              <span className="font-mono">Web application</span>.
-            </li>
-            <li>
-              Add{" "}
-              <span className="font-mono text-[12px]">
-                http://localhost:3000/api/auth/callback/google
-              </span>{" "}
-              as an authorised redirect URI.
-            </li>
-            <li>
-              Put the client id and secret in <span className="font-mono">.env</span> as{" "}
-              <span className="font-mono text-[12px]">AUTH_GOOGLE_ID</span> and{" "}
-              <span className="font-mono text-[12px]">AUTH_GOOGLE_SECRET</span>, then
-              restart the server.
-            </li>
-          </ol>
+          <dl className="mt-9 grid gap-x-8 gap-y-5 border-t border-line pt-6 sm:grid-cols-3">
+            <div>
+              <dt className="eyebrow mb-1.5">Discovery</dt>
+              <dd className="text-ui leading-snug text-ink-mute">
+                Open. Any buyer can read the{" "}
+                <Link href="/catalog" className={linkClass}>
+                  catalog
+                </Link>{" "}
+                without an account.
+              </dd>
+            </div>
+            <div>
+              <dt className="eyebrow mb-1.5">Execution</dt>
+              <dd className="text-ui leading-snug text-ink-mute">
+                Gated. Every purchase needs a signed, unexpired mandate.
+              </dd>
+            </div>
+            <div>
+              <dt className="eyebrow mb-1.5">Record</dt>
+              <dd className="text-ui leading-snug text-ink-mute">
+                Permanent. Each decision is chained to the one before it.
+              </dd>
+            </div>
+          </dl>
         </div>
-      )}
 
-      <p className="mt-6 text-[12.5px] leading-relaxed text-ink-mute">
-        Writ never sees a password. Signing in creates an account holding your name,
-        email address and profile picture, and nothing else.
-      </p>
+        <div className="md:pt-14">
+          {errorParam && (
+            <div
+              role="alert"
+              className="mb-5 rounded-sm border border-deny/25 bg-deny-wash px-3.5 py-2.5"
+            >
+              <p className="text-ui leading-relaxed text-deny">
+                {SIGN_IN_ERRORS[errorParam] ?? "Something went wrong signing you in."}
+              </p>
+              {/* The code, always. "Something went wrong" is useless to whoever has to
+                  fix it, and this page is the only place the reason surfaces. */}
+              <p className="mt-1.5 font-mono text-nano text-deny">{errorParam}</p>
+            </div>
+          )}
+
+          {configured ? (
+            <form
+              action={async () => {
+                "use server";
+                await signIn("google", { redirectTo: "/" });
+              }}
+            >
+              <button
+                type="submit"
+                className={`${buttonClass("secondary", "lg")} w-full`}
+              >
+                <GoogleMark />
+                Continue with Google
+              </button>
+            </form>
+          ) : (
+            <div className="rounded-sm border border-hold/25 bg-hold-wash px-4 py-3.5">
+              <p className="text-ui font-medium text-hold">
+                Google sign-in is not set up yet
+              </p>
+              <ol className="mt-2.5 list-decimal space-y-1.5 pl-4 text-ui leading-relaxed text-ink-mute">
+                <li>
+                  In the Google Cloud console, create an OAuth client of type{" "}
+                  <span className="font-mono text-micro">Web application</span>.
+                </li>
+                <li>
+                  Add{" "}
+                  <span className="font-mono text-micro">
+                    http://localhost:3000/api/auth/callback/google
+                  </span>{" "}
+                  as an authorised redirect URI.
+                </li>
+                <li>
+                  Put the client id and secret in{" "}
+                  <span className="font-mono text-micro">.env</span> as{" "}
+                  <span className="font-mono text-micro">AUTH_GOOGLE_ID</span> and{" "}
+                  <span className="font-mono text-micro">AUTH_GOOGLE_SECRET</span>, then
+                  restart the server.
+                </li>
+              </ol>
+            </div>
+          )}
+
+          <p className="mt-5 text-small leading-relaxed text-ink-soft">
+            Writ never sees a password. Signing in creates an account holding your name,
+            email address and profile picture, and nothing else.
+          </p>
+        </div>
+      </div>
     </div>
   );
 }

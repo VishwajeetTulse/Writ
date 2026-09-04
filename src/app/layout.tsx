@@ -1,9 +1,15 @@
 import type { Metadata } from "next";
-import { Instrument_Sans, IBM_Plex_Mono } from "next/font/google";
+import { Instrument_Sans, IBM_Plex_Mono, Newsreader } from "next/font/google";
 import { Nav } from "@/components/nav";
 import { currentUser } from "@/lib/session";
 import { signOut } from "@/lib/auth";
 import "./globals.css";
+
+/**
+ * Three typefaces, three speakers. See the note at the top of globals.css — the split
+ * is semantic, not decorative, and it is the one thing to preserve if this design is
+ * ever revised.
+ */
 
 const sans = Instrument_Sans({
   variable: "--font-instrument-sans",
@@ -15,6 +21,14 @@ const mono = IBM_Plex_Mono({
   variable: "--font-plex-mono",
   subsets: ["latin"],
   weight: ["400", "500", "600"],
+  display: "swap",
+});
+
+/** The human voice. Variable, with optical sizing, so it holds at 15px and at 28px. */
+const serif = Newsreader({
+  variable: "--font-newsreader",
+  subsets: ["latin"],
+  style: ["normal", "italic"],
   display: "swap",
 });
 
@@ -33,17 +47,29 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   }
 
   return (
-    <html lang="en" className={`${sans.variable} ${mono.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col">
+    <html
+      lang="en"
+      className={`${sans.variable} ${mono.variable} ${serif.variable} h-full antialiased`}
+    >
+      <body className="flex min-h-full flex-col">
+        {/* Keyboard users land here first and can jump the navigation entirely. */}
+        <a
+          href="#main"
+          className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-sm focus:bg-ink focus:px-3 focus:py-2 focus:text-ui focus:text-surface"
+        >
+          Skip to content
+        </a>
+
         <Nav
           user={
-            user
-              ? { name: user.name, email: user.email, image: user.image }
-              : null
+            user ? { name: user.name, email: user.email, image: user.image } : null
           }
           signOutAction={signOutAction}
         />
-        <main className="flex-1">{children}</main>
+
+        <main id="main" className="flex-1">
+          {children}
+        </main>
       </body>
     </html>
   );

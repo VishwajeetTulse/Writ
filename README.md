@@ -223,6 +223,12 @@ The spend runway is the signature element. A progress bar shows consumption; it 
 show a boundary being enforced. So the cap is drawn as a wall with space beyond it, and
 a refused attempt renders as a dashed segment cut off by that wall.
 
+Three typefaces, one rule each. A serif carries what a person wrote or is being told —
+the intent on a mandate, the sentence explaining a refusal. Mono carries what the machine
+computed: amounts, reason codes, hashes, latencies. Sans is the chrome. You can tell a
+claim from a computed value without reading a word, which is the same distinction the
+policy engine draws. Full notes at the top of `src/app/globals.css`.
+
 ---
 
 ## API

@@ -54,12 +54,16 @@ export function Runway({
 
   const remaining = Math.max(capPaise - spentPaise, 0);
 
+  const description = `${formatPaise(BigInt(Math.round(spentPaise)))} committed of a ${formatPaise(
+    BigInt(Math.round(capPaise)),
+  )} cap${breach ? `, with a refused attempt beyond it` : ""}.`;
+
   return (
     <div className="w-full">
       {!compact && (
-        <div className="mb-2 flex items-baseline justify-between">
+        <div className="mb-2 flex items-baseline justify-between gap-4">
           <span className="eyebrow">Spend runway</span>
-          <span className="font-mono text-[11px] tnum text-ink-mute">
+          <span className="font-mono text-micro tnum text-ink-soft">
             {formatPaise(BigInt(Math.round(spentPaise)))} of{" "}
             {formatPaise(BigInt(Math.round(capPaise)))} committed
           </span>
@@ -67,8 +71,10 @@ export function Runway({
       )}
 
       <div
-        className={`relative w-full overflow-hidden rounded-[3px] bg-line/60 ${
-          compact ? "h-2" : "h-9"
+        role="img"
+        aria-label={description}
+        className={`relative w-full overflow-hidden rounded-xs border border-hairline bg-sunk ${
+          compact ? "h-1.5" : "h-9"
         }`}
       >
         {/* Beyond the wall. Hatched, because it is not headroom — it is out of bounds. */}
@@ -77,7 +83,7 @@ export function Runway({
           style={{
             left: `${WALL_PCT}%`,
             backgroundImage:
-              "repeating-linear-gradient(45deg, transparent 0 5px, rgba(22,22,26,0.055) 5px 6px)",
+              "repeating-linear-gradient(45deg, transparent 0 5px, rgba(22,21,15,0.05) 5px 6px)",
           }}
         />
 
@@ -104,23 +110,23 @@ export function Runway({
       </div>
 
       {!compact && (
-        <div className="relative mt-1.5 h-8">
-          <span className="absolute left-0 font-mono text-[10px] tnum text-ink-mute">
+        <div className="relative mt-2 h-7">
+          <span className="absolute left-0 font-mono text-nano tnum text-ink-soft">
             {formatPaiseCompact(BigInt(Math.round(remaining)))} left
           </span>
 
           <span
-            className="absolute -translate-x-1/2 whitespace-nowrap text-center font-mono text-[10px] tnum"
+            className="absolute -translate-x-1/2 whitespace-nowrap text-center font-mono text-nano tnum"
             style={{ left: `${WALL_PCT}%` }}
           >
             <span className="block font-medium">
               {formatPaiseCompact(BigInt(Math.round(capPaise)))}
             </span>
-            <span className="eyebrow block">hard cap</span>
+            <span className="eyebrow mt-1 block">hard cap</span>
           </span>
 
           {breach && breach.overshoots && (
-            <span className="absolute right-0 max-w-[38%] truncate text-right font-mono text-[10px] tnum text-deny">
+            <span className="absolute right-0 max-w-[36%] truncate text-right font-mono text-nano tnum text-deny">
               {blockedLabel ?? "refused"}
             </span>
           )}
