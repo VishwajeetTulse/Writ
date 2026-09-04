@@ -239,8 +239,11 @@ rephrase it, and the response says which version you are reading.
 There are two buyers, and the console lets you pick.
 
 **Claude** (`src/lib/agent/claude.ts`) is a real tool loop on `claude-opus-5` with three
-tools: search the catalog, read a product, attempt a purchase. It needs
-`ANTHROPIC_API_KEY`. The model is told the mandate's terms so it can plan sensibly and
+tools: search the catalog, read a product, attempt a purchase. It needs either
+`ANTHROPIC_API_KEY`, or `GOOGLE_CLOUD_PROJECT` and `CLOUD_ML_REGION` to reach the same
+model through Vertex AI on a Google Cloud account. The request is identical on both
+surfaces; only the billing and the authentication differ, and the run says which one it
+used. The model is told the mandate's terms so it can plan sensibly and
 is trusted with none of them — `attempt_purchase` takes a SKU and a quantity, and the
 gateway prices the SKU itself. It may also pass a `claimed_amount_paise`, which is
 recorded and then ignored; when it disagrees with the catalog, the console says so.

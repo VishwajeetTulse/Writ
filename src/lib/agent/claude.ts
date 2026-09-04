@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { AnthropicVertex } from "@anthropic-ai/vertex-sdk";
 import { getProduct, searchCatalog } from "../catalog";
 import { attemptPurchase, newIdempotencyKey } from "../gateway";
 import { getMandateSummary, loadMandate } from "../mandate-service";
@@ -45,9 +46,43 @@ interface Ctx {
   emit: (e: RunEvent) => void;
 }
 
-/** True when a Claude-driven run is possible at all. */
+/**
+ * Two ways to reach the model, and the environment decides which.
+ *
+ * `ANTHROPIC_API_KEY` is the direct path. `GOOGLE_CLOUD_PROJECT` plus `CLOUD_ML_REGION`
+ * routes the same requests through Claude on Google Cloud Vertex AI instead, which
+ * bills against a GCP account and authenticates with application default credentials
+ * rather than a key. Everything this file asks for — tool use, strict tool schemas,
+ * adaptive thinking, effort — is supported on both, so nothing below changes.
+ */
 export function claudeAvailable(): boolean {
-  return Boolean(process.env.ANTHROPIC_API_KEY);
+  return Boolean(process.env.ANTHROPIC_API_KEY) || vertexConfigured();
+}
+
+function vertexConfigured(): boolean {
+  return Boolean(process.env.GOOGLE_CLOUD_PROJECT && process.env.CLOUD_ML_REGION);
+}
+
+/** Which surface a run will use. Reported on screen so the label is never a guess. */
+export function claudeSurface(): "vertex" | "anthropic" | "none" {
+  if (process.env.ANTHROPIC_API_KEY) return "anthropic";
+  if (vertexConfigured()) return "vertex";
+  return "none";
+}
+
+/**
+ * The Vertex client and the first-party client expose the same `messages.create`, so
+ * the loop below is written once. The surfaces differ in authentication and billing,
+ * not in the request.
+ */
+function makeClient(): Anthropic {
+  if (!process.env.ANTHROPIC_API_KEY && vertexConfigured()) {
+    return new AnthropicVertex({
+      projectId: process.env.GOOGLE_CLOUD_PROJECT,
+      region: process.env.CLOUD_ML_REGION,
+    }) as unknown as Anthropic;
+  }
+  return new Anthropic();
 }
 
 /**
@@ -140,6 +175,15 @@ export async function runClaude(ctx: Ctx) {
 
   const runId = await startRun({ mandateId, goal, chaos: ctx.chaos ?? null });
   emit({ type: "run_started", runId, goal, driver: "claude", chaos: ctx.chaos ?? null });
+
+  // Which surface served the model is worth saying out loud. It changes who is billed
+  // and how the request authenticated, and a screen that hid it would be guessing.
+  if (claudeSurface() === "vertex") {
+    emit({
+      type: "note",
+      text: `Reaching claude-opus-5 through Vertex AI on ${process.env.GOOGLE_CLOUD_PROJECT}.`,
+    });
+  }
 
   if (ctx.chaos) {
     arm(runId, ctx.chaos);
@@ -296,7 +340,7 @@ export async function runClaude(ctx: Ctx) {
     `you are finished, say so and stop calling tools.`;
 
   const messages: Anthropic.MessageParam[] = [{ role: "user", content: goal }];
-  const client = new Anthropic();
+  const client = makeClient();
 
   let turns = 0;
 
