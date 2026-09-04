@@ -90,7 +90,7 @@ export async function runClaude(ctx: BuyerCtx) {
         model: "claude-opus-5",
         max_tokens: 16000,
         thinking: { type: "adaptive" },
-        // Shopping from a seventeen-item catalog is not a hard reasoning problem, and a
+        // Shopping from a few dozen catalog items is not a hard reasoning problem, and a
         // demo waiting on the model is a demo nobody watches.
         output_config: { effort: "medium" },
         system: session.systemPrompt,

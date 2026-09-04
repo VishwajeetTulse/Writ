@@ -2,6 +2,7 @@ import "dotenv/config";
 import { signWebhookBody } from "../src/lib/razorpay/webhook";
 import { prisma } from "../src/lib/db";
 import { formatPaise } from "../src/lib/money";
+import { append } from "../src/lib/ledger";
 
 /**
  * Local webhook harness.
@@ -14,9 +15,19 @@ import { formatPaise } from "../src/lib/money";
  * are real, created by the gateway against Razorpay's test API. What is simulated is
  * only the delivery of the notification.
  *
+ * **It puts the purchase back afterwards.** Razorpay never collected anything for these
+ * events, so a purchase left marked PAID is a claim that money moved when it did not —
+ * exactly the drift `npm run reconcile` exists to catch, and it did catch three of them
+ * that earlier runs of this script left behind. The audit events stay, because they
+ * record something that genuinely happened; only the purchase status is restored, and
+ * the restore is itself written to the ledger.
+ *
+ * Pass --keep to leave the purchase settled, for inspecting the reconciler's second pass.
+ *
  * Usage:
  *   npx tsx scripts/test-webhook.ts                 # settle the newest unpaid purchase
  *   npx tsx scripts/test-webhook.ts <razorpayOrderId>
+ *   npx tsx scripts/test-webhook.ts --keep
  */
 
 const BASE = process.env.WRIT_BASE_URL ?? "http://localhost:3000";
@@ -164,6 +175,30 @@ async function main() {
     ["payment id recorded", Boolean(after?.razorpayPaymentId)],
     ["redelivery is a no-op", replay.json.note === "already settled"],
   ];
+
+  // --- 4. Put it back -------------------------------------------------------
+  const keep = process.argv.includes("--keep");
+  if (!keep && after?.status === "PAID") {
+    await prisma.purchase.update({
+      where: { id: purchase.id },
+      data: { status: "CREATED", razorpayPaymentId: null },
+    });
+    await append({
+      actor: "system",
+      type: "RAZORPAY_ERROR",
+      mandateId: purchase.mandateId,
+      runId: purchase.runId,
+      amountPaise: purchase.amountPaise,
+      payload: {
+        purchaseId: purchase.id,
+        razorpayOrderId: purchase.razorpayOrderId,
+        note:
+          "test-webhook settled this purchase with a locally-signed event and then " +
+          "restored it. Razorpay never collected anything for it.",
+      },
+    });
+    console.log("\n  restored to CREATED — Razorpay never took this payment");
+  }
 
   console.log("");
   let failed = 0;

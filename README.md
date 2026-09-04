@@ -34,9 +34,9 @@ against immediately.
 
 `.env.example` explains each value. You need a Razorpay **test** key, a mandate signing
 secret, and a Google OAuth client for sign-in; a webhook secret if you want to exercise
-settlement. The Anthropic key is optional and everything in this README works without
-it, see
-[Where the model is](#where-the-model-is-and-is-not).
+settlement. A model key is optional — with `GEMINI_API_KEY` the buyer is a real agent,
+without one it falls back to a scripted buyer and everything in this README still works.
+See [Where the model is](#where-the-model-is-and-is-not).
 
 Writ refuses to use a live Razorpay key. The check sits inside the one function that
 reads the credentials, so there is no path to a live charge that skips it.
@@ -126,7 +126,7 @@ Anthropic key.
 | Razorpay is really wired up | `npm run smoke:razorpay` | Creates a real test-mode order |
 | A mandate is a real UPI Autopay mandate | `npm run autopay:probe` | Compiles the signed terms into a token and creates the authorisation order |
 | The whole gated path works | `npm run gate2` | 10 assertions end to end, real orders |
-| Webhooks cannot be forged | `npm run webhook:test` | Rejects unsigned, wrong-signature and tampered bodies |
+| Webhooks cannot be forged | `npm run webhook:test` | Rejects unsigned, wrong-signature and tampered bodies, settles on a valid one, no-ops on redelivery, then restores the purchase because Razorpay never collected anything |
 | A purchase can really be paid | `/settle/<purchase>`, then `npm run reconcile` | Razorpay checkout against a gateway-created order; a real capture, settled by pulling Razorpay's own status |
 | The ledger has not drifted from Razorpay | `npm run reconcile` | Two passes: did anything settle without us hearing, and does Razorpay confirm everything we call settled |
 | Revocation lands on the next call | `npm run revoke:test` | Revokes mid-run, asserts the next attempt is refused |
@@ -289,10 +289,11 @@ limit. Nobody wrote that sequence.
 |---|---|
 | **Mandates** | Every grant, what it permits, what it has spent, what it refused |
 | **Catalog** | The shops and stock an AI buyer can see, with each item marked against your own mandates. Open without an account, the same list the agent reads as JSON |
-| **New mandate** | Set the bounds and read what they mean. The preview runs the *real* policy engine in the browser against the live catalog, so before you sign you can see which products it permits and which it refuses, with the reason code for each |
+| **New mandate** | Set the bounds and read what they mean. The preview runs the *real* policy engine in the browser against the live catalog, so before you sign you can see how much of it these terms permit and what they would refuse |
 | **Activity** | Split pane. What the buyer did on the left, what the gateway decided on the right. Nothing crosses between them except a SKU and a quantity |
 | **Ledger** | The hash-chained trail, filterable by cause, with live chain verification |
 | **Spending** | What was spent, what is left on each mandate, and why purchases were stopped |
+| **Settle** | An operator screen, off the agent path, that opens Razorpay's checkout against an order the gateway already authorised |
 
 The spend runway is the signature element. A progress bar shows consumption; it cannot
 show a boundary being enforced. So the cap is drawn as a wall with space beyond it, and
@@ -302,7 +303,12 @@ Three typefaces, one rule each. A serif carries what a person wrote or is being 
 the intent on a mandate, the sentence explaining a refusal. Mono carries what the machine
 computed: amounts, reason codes, hashes, latencies. Sans is the chrome. You can tell a
 claim from a computed value without reading a word, which is the same distinction the
-policy engine draws. Full notes at the top of `src/app/globals.css`.
+policy engine draws.
+
+Light and dark both ship and follow the system setting, with an auto/light/dark control
+in the header. Dark redefines colour tokens and nothing else, so no component knows which
+theme it is in. Every pair measures at least 4.5:1. Full notes at the top of
+`src/app/globals.css`.
 
 ---
 
@@ -365,6 +371,16 @@ means — but reconciliation can go to the source and ask, and it does. It recor
 disagreement in the audit trail and changes no status, because deciding what a
 discrepancy means is a human's job.
 
+**The free tier ran out mid-build, three times.** Google meters Gemini at 20 requests
+per day per model, and one agent run costs a request per turn, so two or three rehearsals
+exhaust a model. It first showed up as a 503 that looked like load and was actually the
+edge of a quota. The fix was not to pick a better model: the quota is per model, so the
+buyer now walks a chain of them, abandoning one that is out of quota immediately and
+backing off from one that is merely busy. Verified against a genuinely exhausted model —
+`gemini-3.6-flash` out of quota, moved to `gemini-3.7-flash`, backed off twice, finished
+the run. `npm run gemini:models` measures which ids answer, by calling them, because a
+model can list and still 404.
+
 **Razorpay rejected the UPI authorisation order.** A mandate grants future authority
 without collecting anything, so the order was created for zero, and the API returned
 `Order amount less than minimum amount allowed`. ₹1 is the conventional mandate
@@ -410,7 +426,7 @@ Stated plainly, because a security claim with unstated boundaries is worth nothi
   deletion by anyone who cannot recompute the whole chain. Someone with write access to
   the entire table could rebuild it consistently. Anchoring the head hash externally
   would close that.
-- **The catalog is seeded**, four merchants and seventeen products, not a live merchant
+- **The catalog is seeded**, eight merchants and thirty-five products, not a live merchant
   integration.
 - **The mandate id is the agent's only credential.** Sign-in protects the console, and
   every mandate, purchase and ledger row is scoped to the account that owns it. The
@@ -446,11 +462,12 @@ documented in `prisma/seed.ts`.
 ## Stack
 
 Next.js 16 (App Router, Turbopack) · React 19 · Tailwind v4 · Prisma 7 on SQLite ·
-Vitest · Razorpay test-mode REST · Anthropic SDK for the buyer agent, optional.
+Auth.js with Google · Vitest · Razorpay test-mode REST · Google Gen AI SDK for the buyer
+agent, with the Anthropic SDK as an alternative driver. Both optional.
 
-Fonts are Instrument Sans and IBM Plex Mono, and the split is load-bearing: anything
-the machine computed is set in mono, anything a person wrote is sans. A reader can tell
-claims from evidence without reading a word.
+Three typefaces, one rule each: Newsreader for what a person wrote or is being told, IBM
+Plex Mono for what the machine computed, Instrument Sans for the chrome. A reader can
+tell a claim from evidence without reading a word.
 
 More detail in [`docs/webhooks.md`](docs/webhooks.md). The five-minute demo script,
 with the real numbers a run produces, is in

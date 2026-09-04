@@ -28,9 +28,9 @@ import {
  * depend on that, and the preview does not show a latency.
  *
  * That turns signing from an act of faith into an act of reading. Before you grant
- * authority you can see precisely which of a merchant's products this mandate permits
- * and which it refuses, with the reason code for each. A cap is an abstraction; "this
- * refuses the ₹28,999 television and permits the ₹62 milk" is not.
+ * authority you can see how much of the catalog these terms actually permit, and the
+ * runway shows the most expensive thing they would refuse. A cap is an abstraction;
+ * "permits 12 of 35, and stops the ₹28,999 television" is not.
  */
 
 export interface FormProduct {

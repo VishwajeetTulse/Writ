@@ -9,11 +9,11 @@ import type { Coverage } from "@/lib/catalog-coverage";
  * The catalog browser.
  *
  * Laid out as a catalogue rather than a grid of product cards: each shop is a heading
- * with its stock listed beneath it. A card per product would give seventeen equally
+ * with its stock listed beneath it. A card per product would give thirty-five equally
  * weighted boxes and no way to see which shop you were in.
  *
  * Filtering happens in the browser rather than as a round trip, because the whole
- * catalog is seventeen items and a server hop for a keystroke would be slower and
+ * catalog is a few dozen items and a server hop for a keystroke would be slower and
  * worse. If this ever holds a real merchant's inventory, the filters move to the
  * query in `searchCatalog` and this component takes a page of results instead.
  */

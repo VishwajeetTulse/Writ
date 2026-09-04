@@ -22,8 +22,9 @@ import type { RunEvent } from "./events";
  * Second, a demo that cannot fail. This path needs no model, no API key and no tokens,
  * so it runs the same on a conference network at 9am as it does here.
  *
- * When an Anthropic key is configured, `claude.ts` drives the same sequence of gateway
- * calls with a real tool loop and emits the same events. The console does not change.
+ * The two model drivers, `gemini.ts` and `claude.ts`, run real tool loops over the same
+ * gateway and emit the same events. The console does not change; it only relabels which
+ * buyer ran. Anything they share lives in `buyer.ts`.
  */
 
 interface Ctx {
