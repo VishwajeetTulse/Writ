@@ -24,7 +24,7 @@ export default async function RunPage() {
       wide
       kicker="Live"
       title="Activity"
-      lede="Watch an agent shop against a mandate. Every purchase it proposes is judged before any money is committed."
+      lede="Watch an agent shop against a mandate."
     >
       {mandates.length === 0 ? (
         <Empty

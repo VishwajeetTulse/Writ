@@ -73,11 +73,8 @@ export default async function MandateDetailPage({ params }: PageProps<"/mandates
         {!signatureValid && (
           <div className="rounded-md border border-deny/30 bg-deny-wash px-4 py-3">
             <p className="human text-lede text-deny">
-              These terms have been changed since they were signed.
-            </p>
-            <p className="mt-1 text-ui leading-relaxed text-deny">
-              Nothing can be spent against this mandate. Every figure below is being read
-              from a record that no longer matches what anyone agreed to.
+              These terms have been changed since they were signed. Nothing can be spent
+              against this mandate.
             </p>
           </div>
         )}
@@ -168,48 +165,29 @@ export default async function MandateDetailPage({ params }: PageProps<"/mandates
             </span>
           }
         >
-          <p className="human mb-6 max-w-[68ch] text-lede leading-[1.55] text-ink-mute">
-            UPI Autopay mandates carry a per-debit ceiling, an expiry and a rate. So does
-            this one, and the three values below are the ones Razorpay would be handed.
-            The rest of the terms have no equivalent on the rail, which is why the policy
-            engine has to enforce them here.
-          </p>
-
           <div className="grid grid-cols-2 gap-x-6 gap-y-6 sm:grid-cols-3">
-            <Field label="token.max_amount">{token.max_amount} paise</Field>
-            <Field label="token.expire_at">{token.expire_at}</Field>
-            <Field label="token.frequency">{token.frequency}</Field>
+            <Field label="Per debit">{token.max_amount} paise</Field>
+            <Field label="Expires">{token.expire_at}</Field>
+            <Field label="Frequency">{token.frequency}</Field>
           </div>
 
           <div className="mt-7 border-t border-hairline pt-6">
-            <div className="eyebrow mb-3">Enforced by Writ, not by UPI</div>
+            <div className="eyebrow mb-3">Held by Writ, not by UPI</div>
             <ul className="divide-y divide-hairline border-b border-hairline">
               {unmapped.map((b) => (
-                <li key={b.bound} className="flex flex-wrap items-baseline gap-x-3 py-2.5">
-                  <span className="w-32 shrink-0 text-ui">{b.bound}</span>
+                <li key={b.bound} className="flex items-baseline gap-3 py-2.5">
+                  <span className="w-36 shrink-0 text-ui">{b.bound}</span>
                   <span className="font-mono text-micro tnum">{b.value}</span>
-                  <span className="w-full text-small text-ink-soft sm:ml-auto sm:w-auto sm:max-w-[52ch] sm:text-right">
-                    {b.why}
-                  </span>
                 </li>
               ))}
             </ul>
           </div>
-
-          <p className="mt-4 text-small leading-relaxed text-ink-soft">
-            Not wired end to end. Creating the authorisation order is a real call and{" "}
-            <span className="font-mono">npm run autopay:probe</span> makes it. Completing
-            the mandate needs a one-time approval in a UPI app, and charging against it
-            needs Recurring Payments enabled on the Razorpay account.
-          </p>
         </Section>
 
         <div className="grid gap-11 lg:grid-cols-2">
           <Section title={`Bought · ${purchases.length}`}>
             {purchases.length === 0 ? (
-              <p className="py-6 text-ui text-ink-soft">
-                Nothing has been bought against this mandate.
-              </p>
+              <p className="py-6 text-ui text-ink-soft">Nothing bought yet.</p>
             ) : (
               <ul className="divide-y divide-hairline border-b border-hairline">
                 {purchases.map((p) => (
@@ -253,10 +231,7 @@ export default async function MandateDetailPage({ params }: PageProps<"/mandates
 
           <Section title={`Stopped · ${refusals.length}`}>
             {refusals.length === 0 ? (
-              <p className="py-6 text-ui text-ink-soft">
-                Nothing has been stopped. Either the agent has stayed inside these limits,
-                or it has not tried anything yet.
-              </p>
+              <p className="py-6 text-ui text-ink-soft">Nothing stopped yet.</p>
             ) : (
               <ul className="divide-y divide-hairline border-b border-hairline">
                 {refusals.map((e) => {

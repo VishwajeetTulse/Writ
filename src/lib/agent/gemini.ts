@@ -25,20 +25,25 @@ import { MAX_TURNS, startBuyer, TOOL_SCHEMAS, type BuyerCtx } from "./buyer";
 /**
  * The default model.
  *
- * The cheapest tier that reliably makes tool calls, which is all this loop needs. Change
- * it with one line in `.env`:
+ * Chosen for consistency rather than for a good single sample. `npm run gemini:models`
+ * does not list models — it makes a real tool call against each candidate and times it,
+ * because listing proves nothing. Two runs an hour apart on the same key:
+ *
+ *     gemini-3.6-flash          2.9s   2.8s     <- the only one fast twice
+ *     gemini-3.1-flash-lite     1.9s  20.5s
+ *     gemini-3.7-flash          503    6.0s
+ *     gemini-3.8-flash          503   59.3s
+ *     gemini-3.5-flash-lite   164.0s  fetch failed
+ *     gemini-3.1-pro-preview    n/a    429, quota
+ *     gemini-2.5-flash          404 — listed, retired for new keys
+ *
+ * The free tier is that volatile, so a demo pinned to whatever was quickest once will
+ * eventually stall on camera. Re-run the script before recording and set `GEMINI_MODEL`
+ * if the numbers have moved:
  *
  *     GEMINI_MODEL="gemini-3.8-flash"
- *
- * Measured on a real key by `npm run gemini:models`, which does not list models — it
- * makes an actual tool call against each candidate, because listing proves nothing.
- * `gemini-2.5-flash` appears in `models.list()` and then returns 404 on use, being
- * retired for new keys. Of the ones that answered: 3.1-flash-lite in 1.9s,
- * 3.6-flash in 2.9s, 3.5-flash-lite in 164s, and both 3.7 and 3.8 flash returning 503
- * for load. Re-run that script before recording anything — availability moves, and a
- * demo waiting on a model is a demo nobody watches.
  */
-const DEFAULT_MODEL = "gemini-3.1-flash-lite";
+const DEFAULT_MODEL = "gemini-3.6-flash";
 
 function apiKey(): string | undefined {
   return process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY;
@@ -78,10 +83,38 @@ const FUNCTION_DECLARATIONS: FunctionDeclaration[] = Object.entries(TOOL_SCHEMAS
  */
 const LOAD_RETRIES = 3;
 
-function isTransient(err: unknown): boolean {
+/**
+ * Models to fall through to when one stops answering.
+ *
+ * Google's free tier meters **20 requests per day, per model** — the 429 says so
+ * outright: `limit: 20, model: gemini-3.6-flash`. One agent run costs a request per
+ * turn, so two or three rehearsals exhaust a model for the day, and a demo pinned to a
+ * single id will fail on camera at the worst possible moment.
+ *
+ * The quota is per model, so a chain multiplies it. Each entry answered a real tool call
+ * during testing; the run moves down the list and says so on screen when it does. The
+ * conversation carries over unchanged, because the history is the history regardless of
+ * which model reads it next.
+ */
+const FALLBACK_CHAIN = [
+  "gemini-3.6-flash",
+  "gemini-3.7-flash",
+  "gemini-3.5-flash",
+  "gemini-3.1-flash-lite",
+  "gemini-3.1-flash-lite-preview",
+  "gemini-3.8-flash",
+];
+
+/** Out of quota. Retrying the same model will not help; another model might. */
+function isQuota(err: unknown): boolean {
   const text = err instanceof Error ? err.message : String(err);
-  // The SDK surfaces the API error as JSON in the message rather than as a typed status.
-  return /"code":\s*(429|503|500)|UNAVAILABLE|RESOURCE_EXHAUSTED/.test(text);
+  return /RESOURCE_EXHAUSTED|"code":\s*429/.test(text);
+}
+
+/** Busy rather than exhausted. Worth waiting for. */
+function isBusy(err: unknown): boolean {
+  const text = err instanceof Error ? err.message : String(err);
+  return /UNAVAILABLE|"code":\s*(503|500)/.test(text);
 }
 
 export async function runGemini(ctx: BuyerCtx) {
@@ -98,37 +131,67 @@ export async function runGemini(ctx: BuyerCtx) {
   const ai = new GoogleGenAI({ apiKey: apiKey() });
   const contents: Content[] = [{ role: "user", parts: [{ text: ctx.goal }] }];
 
+  // The chosen model first, then anything else known to answer. Deduplicated so an
+  // explicit GEMINI_MODEL is not tried twice.
+  const chain = [model, ...FALLBACK_CHAIN.filter((m) => m !== model)];
+  let modelIndex = 0;
+
   let turns = 0;
 
   try {
     while (turns < MAX_TURNS) {
       turns++;
 
-      let response;
-      for (let attempt = 1; ; attempt++) {
-        try {
-          response = await ai.models.generateContent({
-            model,
-            contents,
-            config: {
-              systemInstruction: session.systemPrompt,
-              tools: [{ functionDeclarations: FUNCTION_DECLARATIONS }],
-            },
-          });
-          break;
-        } catch (err) {
-          if (!isTransient(err) || attempt > LOAD_RETRIES) throw err;
-          const waitMs = 1000 * 2 ** (attempt - 1);
+      let response: Awaited<ReturnType<typeof ai.models.generateContent>> | undefined;
+      let lastError: unknown;
+
+      // Walk the chain until something answers. A busy model is waited for; an
+      // exhausted one is abandoned immediately, because burning three more requests
+      // against a daily quota that is already spent only spends it harder.
+      outer: while (modelIndex < chain.length) {
+        const current = chain[modelIndex];
+
+        for (let attempt = 1; ; attempt++) {
+          try {
+            response = await ai.models.generateContent({
+              model: current,
+              contents,
+              config: {
+                systemInstruction: session.systemPrompt,
+                tools: [{ functionDeclarations: FUNCTION_DECLARATIONS }],
+              },
+            });
+            break outer;
+          } catch (err) {
+            lastError = err;
+            if (isQuota(err)) break;
+            if (!isBusy(err) || attempt > LOAD_RETRIES) break;
+
+            const waitMs = 1000 * 2 ** (attempt - 1);
+            emit({
+              type: "note",
+              tone: "warn",
+              text:
+                `${current} is busy. Waiting ${waitMs / 1000}s and trying again ` +
+                `(${attempt} of ${LOAD_RETRIES}). Nothing was spent on this attempt.`,
+            });
+            await new Promise((r) => setTimeout(r, waitMs));
+          }
+        }
+
+        modelIndex++;
+        if (modelIndex < chain.length) {
           emit({
             type: "note",
             tone: "warn",
             text:
-              `${model} is busy. Waiting ${waitMs / 1000}s and trying again ` +
-              `(${attempt} of ${LOAD_RETRIES}). Nothing was spent on this attempt.`,
+              `${current} is ${isQuota(lastError) ? "out of free-tier quota" : "not answering"}. ` +
+              `Continuing on ${chain[modelIndex]}.`,
           });
-          await new Promise((r) => setTimeout(r, waitMs));
         }
       }
+
+      if (!response) throw lastError;
 
       const reply = response.candidates?.[0]?.content;
       if (reply) contents.push(reply);

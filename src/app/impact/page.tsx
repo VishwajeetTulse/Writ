@@ -47,31 +47,25 @@ export default async function SpendingPage() {
             lead
             label="Spent by agents"
             value={formatPaiseCompact(summary.spentPaise)}
-            sub={
-              summary.purchaseCount === 0
-                ? "Nothing has been bought yet."
-                : `Across ${summary.purchaseCount} purchase${
-                    summary.purchaseCount === 1 ? "" : "s"
-                  }, none of which needed your approval.`
-            }
+            sub={`${summary.purchaseCount} purchase${
+              summary.purchaseCount === 1 ? "" : "s"
+            }`}
           />
           <Stat
             label="Stopped"
             value={summary.stoppedCount}
             tone={summary.stoppedCount > 0 ? "deny" : "mute"}
-            sub="Attempts that fell outside a mandate and never reached a payment."
           />
           <Stat
             label="Value stopped"
             value={formatPaiseCompact(summary.stoppedValuePaise)}
             tone={summary.stoppedValuePaise > 0n ? "deny" : "mute"}
-            sub="What those attempts would have cost, had nothing been checking."
           />
           <Stat
             label="Live mandates"
             value={summary.activeMandates}
             tone="mute"
-            sub={`${mandates.length} written in total, including expired and withdrawn.`}
+            sub={`${mandates.length} in total`}
           />
         </section>
 
@@ -84,9 +78,7 @@ export default async function SpendingPage() {
                   Write a mandate
                 </Link>
               }
-            >
-              Every mandate you have written has expired or been withdrawn.
-            </Empty>
+            />
           ) : (
             <ul className="divide-y divide-hairline border-b border-hairline">
               {active.map((m) => (
@@ -132,18 +124,9 @@ export default async function SpendingPage() {
 
         <Section title="Why purchases were stopped">
           {summary.reasons.length === 0 ? (
-            <p className="py-6 text-ui text-ink-soft">
-              Nothing has been stopped. Your agents have stayed inside every limit you
-              set.
-            </p>
+            <p className="py-6 text-ui text-ink-soft">Nothing stopped yet.</p>
           ) : (
-            <>
-              <p className="human mb-5 max-w-[64ch] text-lede leading-[1.55] text-ink-mute">
-                If something here keeps stopping purchases you actually wanted, the limit
-                is too tight rather than the agent being wrong. Widen the mandate.
-              </p>
-
-              <ul className="divide-y divide-hairline border-b border-hairline">
+            <ul className="divide-y divide-hairline border-b border-hairline">
                 {summary.reasons.map((r) => (
                   <li key={r.reasonCode} className="flex items-center gap-4 py-2.5">
                     <span className="w-52 shrink-0 truncate text-ui sm:w-64">
@@ -166,8 +149,7 @@ export default async function SpendingPage() {
                     </span>
                   </li>
                 ))}
-              </ul>
-            </>
+            </ul>
           )}
         </Section>
 

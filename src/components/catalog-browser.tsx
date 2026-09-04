@@ -162,11 +162,7 @@ export function CatalogBrowser({
               Clear the filters
             </button>
           }
-        >
-          {coveredOnly
-            ? "You are only showing items one of your mandates covers. Turn that off to see the rest of the shelf."
-            : "Try a shorter search, or a different shop."}
-        </Empty>
+        />
       ) : (
         <div className="space-y-10">
           {filtered.map((m) => (
@@ -225,9 +221,8 @@ function MerchantListing({
               </p>
 
               {p.addressesAgents && (
-                <p className="mt-2 border-l-2 border-hold/50 pl-2.5 text-small leading-snug text-hold">
-                  This description contains instructions aimed at AI agents. Nothing
-                  written here can change a limit.
+                <p className="mt-2 border-l-2 border-hold/50 pl-2.5 text-small text-hold">
+                  Contains instructions aimed at AI agents.
                 </p>
               )}
             </div>

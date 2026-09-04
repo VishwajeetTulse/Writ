@@ -342,7 +342,7 @@ export async function startBuyer(
       type: "note",
       text:
         `${allowed} purchase${allowed === 1 ? "" : "s"} for ${formatPaise(BigInt(spentPaise))}, ` +
-        `${blocked} refused. Every line above is in the hash-chained ledger.`,
+        `${blocked} refused.`,
     });
 
     // A run whose mandate was pulled out from under it did not "complete" in any

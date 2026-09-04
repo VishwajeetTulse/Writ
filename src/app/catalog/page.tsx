@@ -59,10 +59,9 @@ export default async function CatalogPage() {
 
   return (
     <Page
-      wide
       kicker="Open to any buyer"
       title="Catalog"
-      lede="What an AI buyer can see. Four shops and their stock, seeded as demo data — a real merchant would publish its own feed."
+      lede="Shops and stock an AI buyer can see. Demo data."
       actions={
         user ? (
           <Link href="/mandates/new" className={buttonClass("primary", "md")}>
@@ -88,12 +87,12 @@ export default async function CatalogPage() {
             hasMandates={mandates.length > 0}
           />
 
-          <p className="mt-10 max-w-[70ch] border-t border-line pt-5 text-small leading-relaxed text-ink-soft">
-            Anyone can read this list without an account, as JSON at{" "}
+          <p className="mt-10 border-t border-line pt-5 text-small text-ink-soft">
+            Also readable as JSON at{" "}
             <a href="/api/catalog" className={`font-mono ${linkClass}`}>
               /api/catalog
             </a>
-            . Buying from it takes a signed mandate.
+            .
           </p>
         </>
       )}

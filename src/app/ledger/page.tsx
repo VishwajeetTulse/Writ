@@ -91,7 +91,7 @@ export default async function LedgerPage({ searchParams }: PageProps<"/ledger">)
       wide
       kicker="Append-only · hash-chained"
       title="Ledger"
-      lede="Every decision made about your money, allowed and stopped alike. Nothing here can be edited after the fact."
+      lede="Every decision made about your money, allowed and stopped alike."
       actions={<VerifyChain recordCount={total} />}
     >
       <div className="mb-5 flex flex-wrap items-center gap-x-2 gap-y-2 border-b border-line pb-4">
@@ -147,11 +147,7 @@ export default async function LedgerPage({ searchParams }: PageProps<"/ledger">)
               </Link>
             )
           }
-        >
-          {filtered
-            ? "The records exist, but none of them are of this kind. Widen the filter to see the rest."
-            : "Rows appear here the moment an agent asks to buy something. Nothing is written until a decision is made."}
-        </Empty>
+        />
       ) : (
         <Scroller>
           <table className="w-full min-w-[980px] border-collapse text-left">

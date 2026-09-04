@@ -472,16 +472,9 @@ export function RunConsole({
           </label>
         </div>
 
-        <p className="mt-3 max-w-[76ch] text-small leading-relaxed text-ink-soft">
-          {briefed
-            ? "The buyer is given the mandate's terms, so it will mostly police itself. That is your own agent, spending under a mandate it can read."
-            : "The buyer is not told its limits, which is the situation when the agent is somebody else's. It finds the walls by being refused, and the gateway is what refuses."}
-        </p>
-
         {selected && selected.status !== "ACTIVE" && (
           <p className="mt-4 rounded-sm border border-hold/25 bg-hold-wash px-3 py-2 text-ui text-hold">
-            This mandate is {selected.status.toLowerCase()}. Every attempt will be
-            refused, which is worth watching at least once.
+            This mandate is {selected.status.toLowerCase()}. Every attempt will be refused.
           </p>
         )}
       </div>
@@ -508,9 +501,8 @@ export function RunConsole({
 
           <div ref={leftRef} className="flex-1 space-y-3.5 overflow-y-auto px-4 py-4">
             {narration.length === 0 && (
-              <p className="human px-2 pt-14 text-center text-lede leading-relaxed text-ink-soft">
-                What the buyer decides to do appears here, in its own words. None of it
-                is trusted.
+              <p className="human px-2 pt-14 text-center text-lede text-ink-soft">
+                What the buyer says appears here.
               </p>
             )}
             {narration.map((n) => (
@@ -540,9 +532,8 @@ export function RunConsole({
 
           <div ref={rightRef} className="flex-1 overflow-y-auto">
             {attempts.length === 0 ? (
-              <p className="px-6 pt-14 text-center text-ui leading-relaxed text-ink-soft">
-                Every verdict is decided here, from the catalog price and the signed
-                terms.
+              <p className="px-6 pt-14 text-center text-ui text-ink-soft">
+                Verdicts appear here.
               </p>
             ) : (
               <ul className="divide-y divide-hairline">
@@ -587,10 +578,9 @@ export function RunConsole({
                         <DecisionExplanation decision={a.decision} />
 
                         {a.decision.recovered && (
-                          <div className="mt-2 rounded-sm border border-hold/25 bg-hold-wash px-2.5 py-2 text-micro leading-relaxed text-hold">
-                            Razorpay failed ({a.decision.recovered.failure}) and the call
-                            was retried with the same idempotency key. One order, one
-                            charge.
+                          <div className="mt-2 rounded-sm border border-hold/25 bg-hold-wash px-2.5 py-2 text-micro text-hold">
+                            Razorpay failed ({a.decision.recovered.failure}). Retried, one
+                            order.
                           </div>
                         )}
 
@@ -641,11 +631,6 @@ export function RunConsole({
         </Panel>
       </div>
 
-      <p className="max-w-[76ch] border-t border-line pt-5 text-small leading-relaxed text-ink-soft">
-        Each allowed purchase creates a real Razorpay order, which authorises a collection
-        rather than completing one. Settlement needs a payment instrument, which this
-        prototype does not provision.
-      </p>
     </div>
   );
 }

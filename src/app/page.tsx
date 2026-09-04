@@ -37,7 +37,7 @@ export default async function MandatesPage() {
     <Page
       kicker="Your agents"
       title="Mandates"
-      lede="What each agent may spend, where it may spend it, and until when. Every one of these can be withdrawn in a single click."
+      lede="What each agent may spend, where, and until when."
       actions={
         <Link href="/mandates/new" className={buttonClass("primary", "md")}>
           New mandate
@@ -52,11 +52,7 @@ export default async function MandatesPage() {
               Write the first mandate
             </Link>
           }
-        >
-          A mandate names the shops an agent may buy from, caps what it may spend at once
-          and in total, and expires on its own. Until one exists, no agent can spend
-          anything.
-        </Empty>
+        />
       ) : (
         <Stack>
           <Section
@@ -75,10 +71,7 @@ export default async function MandatesPage() {
                     Write a mandate
                   </Link>
                 }
-              >
-                Every mandate below has expired or been withdrawn. An agent asking to buy
-                something today would be refused.
-              </Empty>
+              />
             ) : (
               <ul className="divide-y divide-hairline border-b border-hairline">
                 {active.map((m) => (

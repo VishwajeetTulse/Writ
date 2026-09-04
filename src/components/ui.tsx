@@ -40,7 +40,13 @@ export function Page({
   wide?: boolean;
 }) {
   return (
-    <div className={`mx-auto px-5 py-8 sm:px-8 ${wide ? "max-w-[1400px]" : "max-w-[1040px]"}`}>
+    <div
+      className={`mx-auto py-8 ${
+        wide
+          ? "max-w-[1400px] px-6 sm:px-12 lg:px-20"
+          : "max-w-[1040px] px-5 sm:px-8"
+      }`}
+    >
       <header className="mb-8 flex flex-wrap items-end justify-between gap-x-8 gap-y-4 border-b border-line pb-5">
         <div className="min-w-0">
           {kicker && <div className="eyebrow mb-2.5">{kicker}</div>}

@@ -245,7 +245,7 @@ export function MandateForm({
     <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,460px)] lg:gap-8">
       {/* ---------------------------------------------------------------- form */}
       <div className="space-y-5">
-        <Group label="What this is for" htmlFor="intent" hint="Kept verbatim in the audit trail, exactly as written.">
+        <Group label="What this is for" htmlFor="intent">
           <textarea
             id="intent"
             value={intentText}
@@ -350,29 +350,31 @@ export function MandateForm({
           </label>
 
           {velocityOn && (
-            <div className="mt-3.5 flex flex-wrap items-center gap-2 text-ui">
+            <div className="mt-3.5 flex items-center gap-2 text-ui">
               <input
                 type="number"
                 min={1}
                 value={velocityMax}
                 aria-label="Purchases allowed"
                 onChange={(e) => setVelocityMax(Math.max(Number(e.target.value), 1))}
-                className={`${controlClass} h-[34px] w-16 px-2 text-center font-mono tnum`}
+                className={`${controlClass} h-[34px] w-14 shrink-0 px-1 text-center font-mono tnum`}
               />
-              <span className="text-ink-mute">purchases every</span>
+              <span className="shrink-0 whitespace-nowrap text-ink-mute">
+                purchases every
+              </span>
               <input
                 type="number"
                 min={1}
                 value={windowCount}
                 aria-label="Length of the window"
                 onChange={(e) => setWindowCount(Math.max(Number(e.target.value), 1))}
-                className={`${controlClass} h-[34px] w-16 px-2 text-center font-mono tnum`}
+                className={`${controlClass} h-[34px] w-14 shrink-0 px-1 text-center font-mono tnum`}
               />
               <select
                 value={windowUnit}
                 aria-label="Unit of the window"
                 onChange={(e) => setWindowUnit(e.target.value as UnitKey)}
-                className={`${controlClass} h-[34px] w-auto`}
+                className={`${controlClass} h-[34px] w-auto min-w-0 shrink px-1.5`}
               >
                 <option value="minute">{windowCount === 1 ? "minute" : "minutes"}</option>
                 <option value="hour">{windowCount === 1 ? "hour" : "hours"}</option>
@@ -401,10 +403,6 @@ export function MandateForm({
           >
             {submitting ? "Signing…" : "Sign and issue"}
           </Button>
-          <p className="mt-2.5 text-center text-small text-ink-soft">
-            Signing seals these terms. Changing any of them afterwards breaks the seal,
-            and the mandate stops working.
-          </p>
         </div>
       </div>
 
@@ -506,9 +504,6 @@ export function MandateForm({
           </Scroller>
         </Panel>
 
-        <p className="mt-3 text-small leading-relaxed text-ink-soft">
-          These are the decisions this mandate will actually make once it is signed.
-        </p>
       </div>
     </div>
   );

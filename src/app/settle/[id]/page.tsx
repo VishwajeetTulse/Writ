@@ -42,7 +42,7 @@ export default async function SettlePage({ params }: PageProps<"/settle/[id]">) 
     <Page
       kicker="Operator action"
       title="Settle this order"
-      lede="The gateway authorised this collection. Completing it needs a payment instrument, which this prototype does not provision — so here it is done by hand, once, against Razorpay test mode."
+      lede="Pay an order the gateway already authorised."
     >
       <Stack>
         <Section title="The order">
@@ -73,12 +73,6 @@ export default async function SettlePage({ params }: PageProps<"/settle/[id]">) 
             </p>
           ) : (
             <>
-              <p className="human mb-5 max-w-[64ch] text-lede leading-[1.55] text-ink-mute">
-                Razorpay&rsquo;s own checkout opens against this order id. Pay it with any
-                test card and the capture appears in the Razorpay dashboard as a real
-                test-mode transaction, because it is one.
-              </p>
-
               <SettleCheckout
                 keyId={keyId}
                 orderId={purchase.razorpayOrderId}
@@ -86,17 +80,9 @@ export default async function SettlePage({ params }: PageProps<"/settle/[id]">) 
                 description={purchase.sku}
               />
 
-              <div className="mt-7 border-t border-hairline pt-5">
-                <div className="eyebrow mb-2.5">After paying</div>
-                <p className="max-w-[64ch] text-ui leading-relaxed text-ink-mute">
-                  Run <span className="font-mono text-micro">npm run reconcile</span>. The
-                  ledger settles this purchase by asking Razorpay what happened, rather
-                  than by trusting the browser that just told it. On a localhost demo
-                  there is no public URL for Razorpay to send a webhook to, so pulling is
-                  the only honest route — and it is the same code path that recovers from
-                  a webhook being dropped in production.
-                </p>
-              </div>
+              <p className="mt-6 text-ui text-ink-soft">
+                Then run <span className="font-mono text-micro">npm run reconcile</span>.
+              </p>
             </>
           )}
         </Section>

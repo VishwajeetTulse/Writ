@@ -119,11 +119,9 @@ export function SettleCheckout({
         {paymentId && (
           <p className="mt-1.5 font-mono text-micro text-permit">{paymentId}</p>
         )}
-        <p className="mt-2.5 max-w-[62ch] text-ui leading-relaxed text-ink-mute">
-          The purchase is still recorded as unsettled here, and that is deliberate. A
-          browser callback is something the browser said. Run{" "}
-          <span className="font-mono text-micro">npm run reconcile</span> and the ledger
-          will settle it from Razorpay&rsquo;s own answer instead.
+        <p className="mt-2.5 text-ui text-ink-mute">
+          Run <span className="font-mono text-micro">npm run reconcile</span> to settle it
+          here.
         </p>
       </div>
     );
