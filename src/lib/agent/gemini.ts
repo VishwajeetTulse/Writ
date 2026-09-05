@@ -124,10 +124,6 @@ export async function runGemini(ctx: BuyerCtx) {
   const { emit } = ctx;
   const model = geminiModel();
 
-  // Say which model is driving. It changes what the buyer pane is showing, and a screen
-  // that hid it would be guessing.
-  emit({ type: "note", text: `Buyer is ${model}.` });
-
   const ai = new GoogleGenAI({ apiKey: apiKey() });
   const contents: Content[] = [{ role: "user", parts: [{ text: ctx.goal }] }];
 
@@ -172,7 +168,7 @@ export async function runGemini(ctx: BuyerCtx) {
               type: "note",
               tone: "warn",
               text:
-                `${current} is busy. Waiting ${waitMs / 1000}s and trying again ` +
+                `The buyer is busy. Waiting ${waitMs / 1000}s and trying again ` +
                 `(${attempt} of ${LOAD_RETRIES}). Nothing was spent on this attempt.`,
             });
             await new Promise((r) => setTimeout(r, waitMs));
@@ -185,8 +181,8 @@ export async function runGemini(ctx: BuyerCtx) {
             type: "note",
             tone: "warn",
             text:
-              `${current} is ${isQuota(lastError) ? "out of free-tier quota" : "not answering"}. ` +
-              `Continuing on ${chain[modelIndex]}.`,
+              `The buyer is ${isQuota(lastError) ? "out of quota" : "not answering"}. ` +
+              `Trying another way in. Nothing was spent on this attempt.`,
           });
         }
       }

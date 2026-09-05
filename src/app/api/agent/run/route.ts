@@ -74,17 +74,15 @@ export async function POST(request: Request) {
         const resolved =
           wanted === "auto" ? (geminiAvailable() ? "gemini" : "scripted") : wanted;
 
-        // Asking for the model without a key says so and falls back, rather than
-        // quietly running something else and letting the label do the lying.
+        // Asking for the real buyer without a key says so and falls back, rather than
+        // quietly running something else and reporting it as the thing that was asked for.
         const reachable = resolved === "gemini" ? geminiAvailable() : true;
 
         if (!reachable) {
           emit({
             type: "note",
             tone: "warn",
-            text:
-              "GEMINI_API_KEY is not set, so the buyer cannot run as a model. " +
-              "Falling back to the scripted one.",
+            text: "No buyer key is configured. Running the scripted buyer instead.",
           });
         }
 

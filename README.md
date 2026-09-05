@@ -262,9 +262,9 @@ should not depend on a third API being up, and because it makes the point sharpe
 substituting a script and getting identical verdicts is the strongest available
 statement that enforcement does not depend on the thing being enforced against.
 
-Both emit the same events and both are judged by the same gateway. The buyer pane
-labels whichever one actually ran, read off the run's own `run_started` event rather
-than off the dropdown.
+Both emit the same events and both are judged by the same gateway. Which one ran is
+carried on the run's own `run_started` event; the screen does not name it, because the
+model was never the interesting half of a run.
 
 `read_product` hands the model the merchant's description verbatim, prompt injection and
 all, because merchant-controlled text is the real attacker's channel into an AI buyer.

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { listMandates } from "@/lib/mandate-service";
 import { requireUser } from "@/lib/session";
 import { RunConsole } from "@/components/run-console";
-import { geminiAvailable, geminiModel } from "@/lib/agent/gemini";
+import { geminiAvailable } from "@/lib/agent/gemini";
 import { buttonClass, Empty, Page } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
@@ -40,7 +40,6 @@ export default async function RunPage() {
       ) : (
         <RunConsole
           geminiReady={geminiAvailable()}
-          geminiModel={geminiModel()}
           mandates={mandates.map((m) => ({
             id: m.id,
             intentText: m.intentText,

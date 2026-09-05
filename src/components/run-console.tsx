@@ -123,29 +123,13 @@ function DecisionExplanation({
 
 type Driver = "gemini" | "scripted";
 
-/**
- * What the buyer pane says it is running.
- *
- * Read off the run's own `run_started` event rather than guessed from configuration:
- * the server picks the driver, and a run with no key falls back to the scripted buyer.
- * The screen reports what happened.
- */
-function label(driver: Driver, geminiModel: string, ran: boolean): string {
-  const name = driver === "gemini" ? geminiModel : "scripted";
-  if (!ran) return name;
-  return driver === "scripted" ? "scripted · no model" : `${name} · real model`;
-}
-
 export function RunConsole({
   mandates,
   geminiReady,
-  geminiModel,
 }: {
   mandates: RunMandate[];
-  /** Whether a Gemini key is configured on the server. */
+  /** Whether a model key is configured on the server. */
   geminiReady: boolean;
-  /** Which model a run would use, so the pane can name it before one starts. */
-  geminiModel: string;
 }) {
   const active = mandates.filter((m) => m.status === "ACTIVE");
   const [mandateId, setMandateId] = useState(active[0]?.id ?? mandates[0]?.id ?? "");
@@ -156,8 +140,6 @@ export function RunConsole({
   /** Off by default: an agent that already knows the limits proves nothing. */
   const [briefed, setBriefed] = useState(false);
   const driver: Driver = geminiReady ? "gemini" : "scripted";
-  /** Which driver the server actually ran, from run_started. Never assumed. */
-  const [ranAs, setRanAs] = useState<Driver | null>(null);
   const [chaos, setChaos] = useState(false);
   const [pauseForRevocation, setPauseForRevocation] = useState(false);
   const [revoking, setRevoking] = useState(false);
@@ -203,7 +185,6 @@ export function RunConsole({
     setAttempts([]);
     setEnded(null);
     setRunId(null);
-    setRanAs(null);
     setRevoked(false);
     setSpend({ spent: selected?.spentPaise ?? 0, cap: selected?.totalCapPaise ?? 0 });
 
@@ -289,7 +270,6 @@ export function RunConsole({
     switch (event.type) {
       case "run_started":
         setRunId(event.runId);
-        setRanAs(event.driver);
         break;
 
       case "plan":
@@ -464,14 +444,7 @@ export function RunConsole({
       {/* ----------------------------------------------------------- the panes */}
       <div className="grid gap-4 lg:grid-cols-2">
         <Panel pad={false} className="flex h-[460px] flex-col lg:h-[540px]">
-          <PanelHead
-            title="Buyer"
-            aside={
-              <span className="font-mono text-nano uppercase tracking-[0.07em] text-ink-soft">
-                {label(ranAs ?? driver, geminiModel, ranAs !== null)}
-              </span>
-            }
-          />
+          <PanelHead title="Buyer" />
 
           <div ref={leftRef} className="flex-1 space-y-3.5 overflow-y-auto px-4 py-4">
             {narration.length === 0 && (
