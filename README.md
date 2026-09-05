@@ -471,6 +471,3 @@ Three typefaces, one rule each: Newsreader for what a person wrote or is being t
 Plex Mono for what the machine computed, Instrument Sans for the chrome. A reader can
 tell a claim from evidence without reading a word.
 
-More detail in [`docs/webhooks.md`](docs/webhooks.md). The five-minute demo script,
-with the real numbers a run produces, is in
-[`docs/demo-script.md`](docs/demo-script.md).
