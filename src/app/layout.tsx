@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { Instrument_Sans, IBM_Plex_Mono, Newsreader } from "next/font/google";
 import { Nav } from "@/components/nav";
 import { currentUser } from "@/lib/session";
 import { signOut } from "@/lib/auth";
+import { parseTheme, THEME_COOKIE, themeAttribute } from "@/lib/theme";
 import "./globals.css";
 
 /**
@@ -39,7 +41,11 @@ export const metadata: Metadata = {
 };
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
-  const user = await currentUser();
+  const [user, jar] = await Promise.all([currentUser(), cookies()]);
+
+  // Rendered onto <html> below and handed to the toggle, so the served markup, the DOM
+  // React expects, and the button's own label all come from one value.
+  const theme = parseTheme(jar.get(THEME_COOKIE)?.value);
 
   async function signOutAction() {
     "use server";
@@ -47,27 +53,11 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   }
 
   return (
-    // The head script sets data-theme before React hydrates, so the attribute is always
-    // on the client element and never in the server HTML. This exempts only <html> itself.
     <html
       lang="en"
-      suppressHydrationWarning
+      data-theme={themeAttribute(theme)}
       className={`${sans.variable} ${mono.variable} ${serif.variable} h-full antialiased`}
     >
-      <head>
-        {/*
-          Runs before the first paint, so a viewer who chose light or dark never sees a
-          frame of the other one. It only sets an attribute; the CSS does the rest, and
-          an untouched preference falls through to prefers-color-scheme.
-        */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html:
-              "try{var t=localStorage.getItem('writ-theme');" +
-              "if(t==='light'||t==='dark'){document.documentElement.dataset.theme=t}}catch(e){}",
-          }}
-        />
-      </head>
       <body className="flex min-h-full flex-col">
         {/* Keyboard users land here first and can jump the navigation entirely. */}
         <a
@@ -81,6 +71,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           user={
             user ? { name: user.name, email: user.email, image: user.image } : null
           }
+          theme={theme}
           signOutAction={signOutAction}
         />
 

@@ -1,6 +1,11 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
+import {
+  parseTheme,
+  themeCookie,
+  type ThemeChoice,
+} from "@/lib/theme";
 
 /**
  * Light, dark, or whatever the system says.
@@ -9,37 +14,51 @@ import { useSyncExternalStore } from "react";
  * two-way switch cannot express it. The default is system, which means most people never
  * touch this.
  *
- * The chosen mode is read from the `data-theme` attribute rather than kept in React
- * state. That attribute is the single source of truth: an inline script in the layout
- * sets it before the first paint, so there is no flash of the wrong theme, and reading it
- * back means the button can never disagree with the page it sits on.
+ * The `data-theme` attribute on `<html>` is the single source of truth on the client, and
+ * the server puts it there from the cookie before the page is sent. Reading it back rather
+ * than keeping a copy in React state means the button can never disagree with the page it
+ * sits on, and the value React hydrates with is the value already in the DOM.
  */
 
-export type ThemeChoice = "system" | "light" | "dark";
-
-export const THEME_KEY = "writ-theme";
-
-/** Fired on the window so every mounted toggle re-reads at once. */
+/** Fired on this window so every mounted toggle re-reads at once. */
 const CHANGED = "writ-theme-change";
 
-function subscribe(onChange: () => void) {
-  window.addEventListener(CHANGED, onChange);
-  // Another tab changing the preference should move this one too.
-  window.addEventListener("storage", onChange);
-  return () => {
-    window.removeEventListener(CHANGED, onChange);
-    window.removeEventListener("storage", onChange);
-  };
+/** Carries a change to this browser's other tabs, which share the cookie. */
+const CHANNEL = "writ-theme";
+
+let bus: BroadcastChannel | null = null;
+
+function channel(): BroadcastChannel | null {
+  if (typeof BroadcastChannel === "undefined") return null;
+  bus ??= new BroadcastChannel(CHANNEL);
+  return bus;
+}
+
+function apply(choice: ThemeChoice) {
+  const root = document.documentElement;
+  if (choice === "system") delete root.dataset.theme;
+  else root.dataset.theme = choice;
 }
 
 function getSnapshot(): ThemeChoice {
-  const set = document.documentElement.dataset.theme;
-  return set === "light" || set === "dark" ? set : "system";
+  return parseTheme(document.documentElement.dataset.theme);
 }
 
-/** The server cannot know the preference, so it renders the default and corrects after. */
-function getServerSnapshot(): ThemeChoice {
-  return "system";
+function subscribe(onChange: () => void) {
+  window.addEventListener(CHANGED, onChange);
+
+  // A channel message only ever arrives from another tab, so this one has to move the
+  // attribute itself before re-reading it.
+  const fromOtherTab = (event: MessageEvent) => {
+    apply(parseTheme(event.data as string));
+    onChange();
+  };
+  channel()?.addEventListener("message", fromOtherTab);
+
+  return () => {
+    window.removeEventListener(CHANGED, onChange);
+    channel()?.removeEventListener("message", fromOtherTab);
+  };
 }
 
 const NEXT: Record<ThemeChoice, ThemeChoice> = {
@@ -54,28 +73,24 @@ const LABEL: Record<ThemeChoice, string> = {
   dark: "dark",
 };
 
-export function ThemeToggle() {
-  const choice = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+export function ThemeToggle({ initial }: { initial: ThemeChoice }) {
+  // `initial` is what the server rendered onto <html> from the same cookie, so the
+  // hydrating value and the value in the DOM are the same and there is nothing to patch.
+  const choice = useSyncExternalStore(subscribe, getSnapshot, () => initial);
 
   function cycle() {
     const next = NEXT[choice];
-    const root = document.documentElement;
 
-    if (next === "system") {
-      delete root.dataset.theme;
-    } else {
-      root.dataset.theme = next;
-    }
-
+    apply(next);
     // A private window or blocked site data must not break the toggle, only its memory.
     try {
-      if (next === "system") localStorage.removeItem(THEME_KEY);
-      else localStorage.setItem(THEME_KEY, next);
+      document.cookie = themeCookie(next);
     } catch {
       // Preference is not persisted. The page still changed, which is what was asked.
     }
 
     window.dispatchEvent(new Event(CHANGED));
+    channel()?.postMessage(next);
   }
 
   return (

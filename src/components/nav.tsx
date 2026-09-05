@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { buttonClass } from "@/components/ui";
 import { ThemeToggle } from "@/components/theme-toggle";
+import type { ThemeChoice } from "@/lib/theme";
 
 /**
  * The masthead.
@@ -32,9 +33,11 @@ export interface NavUser {
 
 export function Nav({
   user,
+  theme,
   signOutAction,
 }: {
   user: NavUser | null;
+  theme: ThemeChoice;
   signOutAction: () => Promise<void>;
 }) {
   const pathname = usePathname();
@@ -84,8 +87,7 @@ export function Nav({
         </nav>
 
         <div className="ml-auto flex shrink-0 items-center gap-3 self-center">
-          <ThemeToggle />
-
+          <ThemeToggle initial={theme} />
 
           {user && (
             <>
