@@ -47,8 +47,11 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   }
 
   return (
+    // The head script sets data-theme before React hydrates, so the attribute is always
+    // on the client element and never in the server HTML. This exempts only <html> itself.
     <html
       lang="en"
+      suppressHydrationWarning
       className={`${sans.variable} ${mono.variable} ${serif.variable} h-full antialiased`}
     >
       <head>
