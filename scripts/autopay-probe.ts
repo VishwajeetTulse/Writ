@@ -22,7 +22,11 @@ import {
 
 async function main() {
   const row = await prisma.mandate.findFirst({
-    where: { status: "ACTIVE" },
+    // Expiry derived rather than trusted from the stored status, the same way
+    // `loadMandate` does it. A lapsed row still reads ACTIVE, and compiling one of those
+    // sends Razorpay an expiry in the past — which comes back as "start time should be
+    // less than end time" and looks like a rail limitation rather than a stale mandate.
+    where: { status: "ACTIVE", expiresAt: { gt: new Date() } },
     orderBy: { createdAt: "desc" },
   });
 
