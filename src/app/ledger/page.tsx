@@ -15,11 +15,11 @@ const FILTERS: Array<{ label: string; params: Record<string, string> }> = [
   { label: "Everything", params: {} },
   { label: "Decisions", params: { type: "POLICY_DECISION" } },
   { label: "Refusals", params: { verdict: "BLOCK" } },
-  { label: "Money moved", params: { type: "ORDER_CREATED" } },
+  { label: "Orders placed", params: { type: "ORDER_CREATED" } },
 ];
 
 const COLUMNS = [
-  { label: "Seq", align: "left" },
+  { label: "No.", align: "left" },
   { label: "Time", align: "left" },
   { label: "Actor", align: "left" },
   { label: "Event", align: "left" },
@@ -54,16 +54,33 @@ export default async function LedgerPage({ searchParams }: PageProps<"/ledger">)
   const verdict = one(sp.verdict) as Verdict | undefined;
   const type = one(sp.type) as EventType | undefined;
 
-  const [events, total] = await Promise.all([
+  // Counted twice on purpose. `matching` is what the current filter selects and is what
+  // the rows are numbered against; `total` is the whole account, for context in the label.
+  const [events, matching, total] = await Promise.all([
     queryLedger({ userId: user.id, mandateId, verdict, type, limit: 200 }),
+    prisma.auditEvent.count({
+      where: {
+        mandate: { userId: user.id },
+        ...(mandateId ? { mandateId } : {}),
+        ...(verdict ? { verdict } : {}),
+        ...(type ? { type } : {}),
+      },
+    }),
     prisma.auditEvent.count({ where: { mandate: { userId: user.id } } }),
   ]);
 
   const activeKey = `${verdict ?? ""}|${type ?? ""}`;
   const filtered = Boolean(mandateId || verdict || type);
 
+  const countLabel =
+    events.length < matching
+      ? `${events.length} of ${matching} records`
+      : filtered
+        ? `${matching} of ${total} records`
+        : `${total} records`;
+
   // Shaped on the server so the client component receives plain data and no bigints.
-  const rows: LedgerRowData[] = events.map((e) => {
+  const rows: LedgerRowData[] = events.map((e, i) => {
     const payload = parsePayload(e.payload);
     const violations = violationsFrom(payload);
     const productName =
@@ -71,6 +88,11 @@ export default async function LedgerPage({ searchParams }: PageProps<"/ledger">)
     const note = typeof payload.note === "string" ? payload.note : null;
 
     return {
+      // The row's place in this account's own ledger. `seq` is the chain's global
+      // position and belongs to the chain, not to the reader: it skips whatever other
+      // accounts wrote in between, and printing it puts gaps on screen that read as
+      // deleted records. Explain still asks by `seq`, which is what identifies a row.
+      no: matching - i,
       seq: e.seq,
       time: timestamp(e.createdAt),
       actor: e.actor,
@@ -91,7 +113,7 @@ export default async function LedgerPage({ searchParams }: PageProps<"/ledger">)
       kicker="Append-only · hash-chained"
       title="Ledger"
       lede="Every decision made about your money, allowed and stopped alike."
-      actions={<VerifyChain recordCount={total} />}
+      actions={<VerifyChain />}
     >
       <div className="mb-5 flex flex-wrap items-center gap-x-2 gap-y-2 border-b border-line pb-4">
         {FILTERS.map((f) => {
@@ -128,7 +150,7 @@ export default async function LedgerPage({ searchParams }: PageProps<"/ledger">)
         )}
 
         <span className="ml-auto font-mono text-micro tnum text-ink-soft">
-          {events.length} of {total} records
+          {countLabel}
         </span>
       </div>
 

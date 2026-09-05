@@ -18,8 +18,12 @@ interface Verification {
  * It recomputes every hash from the first row forward, so an edited payload, a changed
  * verdict, a deleted row and a reordered row all surface as the same failure: the first
  * sequence number where the link stops holding.
+ *
+ * The record count comes back and is not shown. The chain spans every account, so the
+ * number is always larger than the table under this button, and two disagreeing counts
+ * next to each other read as a discrepancy rather than as two different things.
  */
-export function VerifyChain({ recordCount }: { recordCount: number }) {
+export function VerifyChain() {
   const [result, setResult] = useState<Verification | null>(null);
   const [running, setRunning] = useState(false);
   const [ms, setMs] = useState<number | null>(null);
@@ -34,7 +38,7 @@ export function VerifyChain({ recordCount }: { recordCount: number }) {
       setMs(Math.round(performance.now() - started));
       setResult(body);
     } catch {
-      setResult({ valid: false, recordCount, reason: "Could not reach the server." });
+      setResult({ valid: false, recordCount: 0, reason: "Could not reach the server." });
     } finally {
       setRunning(false);
     }
@@ -55,7 +59,7 @@ export function VerifyChain({ recordCount }: { recordCount: number }) {
           </span>
           <span className="font-mono text-micro tnum text-ink-soft">
             {result.valid
-              ? `${result.recordCount} records · ${ms}ms`
+              ? `${ms}ms`
               : (result.reason ?? `broke at seq ${result.brokenAtSeq ?? "?"}`)}
           </span>
         </div>

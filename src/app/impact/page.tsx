@@ -39,13 +39,13 @@ export default async function SpendingPage() {
       wide
       kicker="Across every mandate"
       title="Spending"
-      lede="What your agents have spent, and what was stopped before it could be."
+      lede="What your agents have committed, and what was stopped before it could be."
     >
       <Stack>
         <section className="grid gap-x-8 gap-y-9 sm:grid-cols-2 lg:grid-cols-4">
           <Stat
             lead
-            label="Spent by agents"
+            label="Committed by agents"
             value={formatPaiseCompact(summary.spentPaise)}
             sub={`${summary.purchaseCount} purchase${
               summary.purchaseCount === 1 ? "" : "s"

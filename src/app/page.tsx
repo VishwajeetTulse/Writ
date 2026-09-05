@@ -135,7 +135,7 @@ function MandateRow({
 
           <div className="flex shrink-0 items-start gap-6 text-right sm:gap-8">
             <div className="hidden sm:block">
-              <div className="eyebrow mb-1.5">Bought</div>
+              <div className="eyebrow mb-1.5">Ordered</div>
               <div className="font-mono text-body tnum">{m.purchaseCount}</div>
             </div>
             <div className="hidden sm:block">

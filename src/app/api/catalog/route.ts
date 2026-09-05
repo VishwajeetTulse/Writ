@@ -25,7 +25,20 @@ export async function GET(request: Request) {
   const category = url.searchParams.get("category") ?? undefined;
   const merchantId = url.searchParams.get("merchant") ?? undefined;
   const query = url.searchParams.get("q") ?? undefined;
+  // An AI buyer reads this endpoint's shape off the discovery descriptor and sends
+  // whatever it inferred. Anything that is not a whole number of paise gets told so,
+  // rather than reaching BigInt and coming back as an unexplained 500.
   const maxPriceParam = url.searchParams.get("max_price_paise");
+  if (maxPriceParam !== null && !/^\d+$/.test(maxPriceParam.trim())) {
+    return Response.json(
+      {
+        error:
+          "max_price_paise must be a whole number of paise, for example 50000 for ₹500.",
+      },
+      { status: 400 },
+    );
+  }
+  const maxPrice = maxPriceParam ? BigInt(maxPriceParam.trim()) : undefined;
 
   const [merchants, products] = await Promise.all([
     listMerchants(),
@@ -33,7 +46,7 @@ export async function GET(request: Request) {
       query,
       category,
       merchantId,
-      maxPricePaise: maxPriceParam ? BigInt(maxPriceParam) : undefined,
+      maxPricePaise: maxPrice,
       limit: 200,
     }),
   ]);

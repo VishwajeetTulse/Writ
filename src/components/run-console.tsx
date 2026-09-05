@@ -123,6 +123,17 @@ function DecisionExplanation({
 
 type Driver = "gemini" | "scripted";
 
+/**
+ * Enough of a mandate's own words to choose between two of them.
+ *
+ * An option cannot wrap, so this is cut rather than clipped in CSS. The identifier used
+ * to stand here instead, which named the row without saying anything about it.
+ */
+function shorten(text: string, max = 68): string {
+  const clean = text.trim().replace(/\s+/g, " ");
+  return clean.length > max ? `${clean.slice(0, max - 1).trimEnd()}…` : clean;
+}
+
 export function RunConsole({
   mandates,
   geminiReady,
@@ -203,6 +214,16 @@ export function RunConsole({
           briefed,
         }),
       });
+
+      // Checked before the body is read as a stream. An error comes back as ordinary
+      // JSON, which contains no events, so reading it straight through would end the
+      // run with an empty console and nothing said.
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(
+          body.error ?? `The run could not be started (HTTP ${res.status}).`,
+        );
+      }
 
       if (!res.body) throw new Error("No stream returned.");
 
@@ -337,7 +358,7 @@ export function RunConsole({
             >
               {mandates.map((m) => (
                 <option key={m.id} value={m.id}>
-                  {m.id} · {m.status}
+                  {shorten(m.intentText)} · {m.status}
                 </option>
               ))}
             </select>

@@ -82,6 +82,30 @@ export function newIdempotencyKey(): string {
  * failure produces an exception, and even that is caught and recorded below.
  */
 export async function attemptPurchase(req: PurchaseRequest): Promise<PurchaseResult> {
+  // --- 1. Load ---------------------------------------------------------------
+  // Ahead of recording the attempt, because every ledger row carries the mandate as a
+  // foreign key. Writing the attempt first meant an unknown id failed that constraint
+  // and left the endpoint throwing, so the refusal below could never be reached.
+  const loaded = await loadMandate(req.mandateId);
+  if (!loaded) {
+    await append({
+      actor: "policy",
+      type: "POLICY_DECISION",
+      mandateId: null,
+      runId: null,
+      verdict: "BLOCK",
+      payload: { reasonCode: "MANDATE_NOT_FOUND", mandateId: req.mandateId },
+    });
+
+    return {
+      verdict: "BLOCK",
+      reasonCode: "MANDATE_NOT_FOUND",
+      violations: [],
+      evidence: { mandateId: req.mandateId },
+      latencyUs: 0,
+    };
+  }
+
   await append({
     actor: "agent",
     type: "PURCHASE_ATTEMPTED",
@@ -93,12 +117,6 @@ export async function attemptPurchase(req: PurchaseRequest): Promise<PurchaseRes
       idempotencyKey: req.idempotencyKey,
     },
   });
-
-  // --- 1. Load ---------------------------------------------------------------
-  const loaded = await loadMandate(req.mandateId);
-  if (!loaded) {
-    return refuse(req, "MANDATE_NOT_FOUND", { mandateId: req.mandateId }, 0);
-  }
 
   // --- 4. Price it ourselves, before the policy engine sees the action --------
   // Done ahead of evaluation because the engine must judge the real amount. Whatever
@@ -123,7 +141,11 @@ export async function attemptPurchase(req: PurchaseRequest): Promise<PurchaseRes
     return refuse(req, code, { sku: req.sku }, decision.latencyUs);
   }
 
-  const amountPaise = priceFor(product, req.quantity);
+  // A quantity that is not a whole number cannot be priced — multiplying by it throws.
+  // The engine already refuses one by name, so hand it a zero and let it say so, rather
+  // than failing here and never reaching the check that exists for exactly this.
+  const priceable = Number.isSafeInteger(req.quantity) && req.quantity > 0;
+  const amountPaise = priceable ? priceFor(product, req.quantity) : 0n;
 
   // --- 5 & 6. The policy engine (which also handles replay) ------------------
   const spend = await getSpendState(req.mandateId, req.idempotencyKey);

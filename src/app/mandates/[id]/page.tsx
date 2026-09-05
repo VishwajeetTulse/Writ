@@ -95,8 +95,8 @@ export default async function MandateDetailPage({ params }: PageProps<"/mandates
                 showPaise: false,
               })}
             />
-            <Stat label="Spent" value={formatPaise(detail.spentPaise, { showPaise: false })} />
-            <Stat label="Bought" value={detail.purchaseCount} />
+            <Stat label="Committed" value={formatPaise(detail.spentPaise, { showPaise: false })} />
+            <Stat label="Ordered" value={detail.purchaseCount} />
             <Stat
               label="Stopped"
               value={detail.blockCount}
@@ -185,7 +185,7 @@ export default async function MandateDetailPage({ params }: PageProps<"/mandates
         </Section>
 
         <div className="grid gap-11 lg:grid-cols-2">
-          <Section title={`Bought · ${purchases.length}`}>
+          <Section title={`Ordered · ${purchases.length}`}>
             {purchases.length === 0 ? (
               <p className="py-6 text-ui text-ink-soft">Nothing bought yet.</p>
             ) : (

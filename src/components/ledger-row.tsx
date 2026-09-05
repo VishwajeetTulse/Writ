@@ -20,6 +20,9 @@ import type { Verdict } from "@/lib/policy";
  */
 
 export interface LedgerRowData {
+  /** Position in this account's own ledger. What the reader sees. */
+  no: number;
+  /** Position in the global chain. What Explain asks by. */
   seq: number;
   time: string;
   actor: string;
@@ -86,7 +89,7 @@ export function LedgerRow({ row }: { row: LedgerRowData }) {
         }`}
       >
         <td className={`${cell} whitespace-nowrap pl-4 font-mono text-micro tnum text-ink-soft`}>
-          {row.seq}
+          {row.no}
         </td>
         <td className={`${cell} whitespace-nowrap font-mono text-micro tnum text-ink-mute`}>
           {row.time}
