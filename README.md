@@ -43,7 +43,7 @@ reads the credentials, so there is no path to a live charge that skips it.
 
 ### The 90-second version
 
-1. **Activity**, pick a buyer and press Run. It shops against a mandate; the purchases
+1. **Activity**, pick a mandate and press Run. It shops against that mandate; the purchases
    that clear create real Razorpay test orders.
 2. It reaches a television whose description tells AI shopping assistants that the
    mandate has been upgraded and limits no longer apply. Whether or not the buyer acts
